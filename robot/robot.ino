@@ -98,7 +98,6 @@ void setup()
 
     // Read initial heading
     delay(1000);
-    delay(1000);
     bno055_read_euler_hrp(&myEulerData); // Update Euler data into the structure
     initialHeading = float(myEulerData.h) / 16.00;
     Serial.print("Initial Heading(Yaw): "); // To read out the Heading (Yaw)
@@ -109,7 +108,7 @@ void setup()
 
 void loop()
 {
-    delay(10);
+    delay(10); // TODO: See of this can be removed
 
     // Prints state every 100ms (10Hz)
     if ((millis() - lastTime) >= 100)
@@ -138,6 +137,14 @@ void start() {
     resetRightEncoderCnt();
     bno055_read_euler_hrp(&myEulerData);
     initialHeading = float(myEulerData.h) / 16.00;
+
+    // Initialize motors
+    enableMotor(BOTH_MOTORS);
+
+    // Reset PID state
+    lastError = 0;
+    integral = 0;
+    lastPIDTime = millis();
 
     state = State::PATH;
 }
@@ -204,12 +211,14 @@ void path() {
         setMotorSpeed(BOTH_MOTORS, 0);  // Stop motors
         lastError = 0;
         integral = 0;
+        lastPIDTime = millis();
         state = State::ALIGN;
     }
     else if (isButtonPressed()) {
         setMotorSpeed(BOTH_MOTORS, 0);  // Stop motors
         lastError = 0;
         integral = 0;
+        lastPIDTime = millis();
         state = State::DONE;
     }
 }
@@ -218,11 +227,7 @@ void align() {
     static unsigned long alignStartTime = 0;
     static bool aligning = false;
     static float lastHeading = 0;
-    
-    const float HEADING_TOLERANCE = 0.5;  // degrees
-    const unsigned long TIMEOUT = 1000;   // 1 second
-    const int PUSH_SPEED = 15;
-    
+        
     if (!aligning) {
         alignStartTime = millis();
         bno055_read_euler_hrp(&myEulerData);
