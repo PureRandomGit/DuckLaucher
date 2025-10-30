@@ -91,7 +91,7 @@ void loop()
 {
   delay(50);      // Don't loop too fast
 
-  if ((millis() - lastTime) >= 10) // Print state at 10hz
+  if ((millis() - lastTime) >= 100) // Print state at 10hz
   {
     Serial.println(state);
     lastTime = millis();
