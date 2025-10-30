@@ -54,6 +54,10 @@ enum class State {
 
 State state = State::START;
 
+void printState(State s) {
+    Serial.println(static_cast<int>(s));
+}
+
 void setup()
 {
     delay(100);
@@ -110,7 +114,7 @@ void loop()
     // Prints state every 100ms (10Hz)
     if ((millis() - lastTime) >= 100)
     {
-        Serial.println(state);
+        printState(state);
         lastTime = millis();
     }
 
