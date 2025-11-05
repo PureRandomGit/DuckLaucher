@@ -19,19 +19,19 @@ String btnMsg = " ";
 uint16_t sensorVal[LS_NUM_SENSORS];
 uint16_t sensorCalVal[LS_NUM_SENSORS];
 uint16_t sensorMaxVal[LS_NUM_SENSORS] = {2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500};
-uint16_t sensorMinVal[LS_NUM_SENSORS] = {805, 1047, 759, 955, 790, 1154, 931, 1245};
+uint16_t sensorMinVal[LS_NUM_SENSORS] = {756, 753, 630, 608, 513, 654, 634, 696};
 
 // Robot Constants
-const int MAX_SPEED = 50; // TODO: Find max speed
-const int BASE_SPEED = 20; // TODO: Find base speed
-const int TURN_SPEED = 20; // TODO: Find max turn speed
+const int MAX_SPEED = 100; // TODO: Find max speed
+const int BASE_SPEED = 90; // TODO: Find base speed
+const int TURN_SPEED = 50; // TODO: Find max turn speed
 const int GOAL = 3500;  // Center position for line sensor
-const int SHOOTER_PIN = P8_6; // Pin to control the shooter mechanism
+const int SHOOTER_PIN = P10_4; // Pin to control the shooter mechanism
 
 // PID constants - tune these!
-const float KP = 0.05;    // Proportional gain
-const float KI = 0.0001;  // Integral gain (start small)
-const float KD = 0.05;     // Derivative gain
+const float KP = 0.043;    // Proportional gain
+const float KI = 0.00001;  // Integral gain (start small)
+const float KD = 0.005;     // Derivative gain
 
 // PID state variables
 float lastError = 0;
@@ -39,9 +39,9 @@ float integral = 0;
 unsigned long lastPIDTime = 0;
 
 // Alignment Constants
-const float HEADING_TOLERANCE = 0.5;  // degrees // TODO: adjust as needed
-const unsigned long TIMEOUT = 500;   // .5 second timeout // TODO: adjust as needed
-const int PUSH_SPEED = 15; // TODO: adjust as needed
+const float HEADING_TOLERANCE = 1;  // degrees // TODO: adjust as needed
+const unsigned long TIMEOUT = 1000;   // .5 second timeout // TODO: adjust as needed
+const int PUSH_SPEED = 30; // TODO: adjust as needed
 
 enum class State {
     START,
@@ -150,13 +150,13 @@ void start() {
 }
 
 void path() {
-	/* Valid values are either:
-	 *  DARK_LINE  if your floor is lighter than your line
-	 *  LIGHT_LINE if your floor is darker than your line
-	 */
-	uint8_t lineColor = DARK_LINE;
+  /* Valid values are either:
+   *  DARK_LINE  if your floor is lighter than your line
+   *  LIGHT_LINE if your floor is darker than your line
+   */
+  uint8_t lineColor = DARK_LINE;
 
-	readLineSensor(sensorVal);
+  readLineSensor(sensorVal);
 
     /*
     * Take current sensor values and adjust using previous calibration values
@@ -260,10 +260,12 @@ void align() {
 }
 
 void shoot() {
+    delay(1000); // TODO: Adjust shoot time as needed
     Serial.println("Shooting duck...");
     digitalWrite(SHOOTER_PIN, HIGH);
-    delay(500); // TODO: Adjust shoot time as needed
+    delay(400); // TODO: Adjust shoot time as needed
     digitalWrite(SHOOTER_PIN, LOW);
+    delay(1000); // TODO: Adjust shoot time as needed
 
     state = State::TURN;
 }
@@ -275,7 +277,7 @@ void turn() {
     
     // Calculate encoder counts needed for 180 degree turn
     // Adjust the 500 value based on your robot's dimensions
-    const uint16_t COUNTS_FOR_180 = 500; // TODO: Calibrate this value
+    const uint16_t COUNTS_FOR_180 = 300; // TODO: Calibrate this value
     
     if (!turningStarted) {
         // Start the turn
