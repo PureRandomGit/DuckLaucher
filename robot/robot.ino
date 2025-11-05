@@ -269,65 +269,48 @@ void shoot() {
 }
 
 void turn() {
-    static bool turningInitialized = false;
-    static float targetHeading = 0;
+    static bool turningStarted = false;
+    static uint16_t startLeftCount = 0;
+    static uint16_t startRightCount = 0;
     
-    if (!turningInitialized) {
-        // Calculate target heading (180 degrees from current)
-        bno055_read_euler_hrp(&myEulerData);
-        float currentHeading = float(myEulerData.h) / 16.00;
-        targetHeading = fmod(currentHeading + 180.0, 360.0);
+    // Calculate encoder counts needed for 180 degree turn
+    // Adjust the 500 value based on your robot's dimensions
+    const uint16_t COUNTS_FOR_180 = 500; // TODO: Calibrate this value
+    
+    if (!turningStarted) {
+        // Start the turn
+        startLeftCount = getEncoderLeftCnt();
+        startRightCount = getEncoderRightCnt();
         
-        Serial.print("Starting turn - Current: ");
-        Serial.print(currentHeading);
-        Serial.print(" | Turning to: ");
-        Serial.println(targetHeading);
+        setMotorDirection(LEFT_MOTOR, MOTOR_DIR_FORWARD);
+        setMotorDirection(RIGHT_MOTOR, MOTOR_DIR_BACKWARD);
+        setMotorSpeed(BOTH_MOTORS, TURN_SPEED);
         
-        turningInitialized = true;
+        turningStarted = true;
+        Serial.println("Starting 180 turn");
     }
     
-    // Read current heading
-    bno055_read_euler_hrp(&myEulerData);
-    float currentHeading = float(myEulerData.h) / 16.00;
+    // Check if we've turned enough
+    uint16_t leftTurned = getEncoderLeftCnt() - startLeftCount;
+    uint16_t rightTurned = getEncoderRightCnt() - startRightCount;
+    uint16_t avgTurned = (leftTurned + rightTurned) / 2;
     
-    // Calculate shortest angle difference
-    float error = calculateAngleDifference(targetHeading, currentHeading);
-    
-    Serial.print("Current: ");
-    Serial.print(currentHeading);
-    Serial.print(" | Target: ");
-    Serial.print(targetHeading);
-    Serial.print(" | Error: ");
-    Serial.println(error);
-    
-    // Check if we've reached target (within tolerance)
-    if (abs(error) < 5) {  // Increased tolerance to 5 degrees
+    if (avgTurned >= COUNTS_FOR_180) {
         // Turn complete
         setMotorSpeed(BOTH_MOTORS, 0);
         setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
-        turningInitialized = false;  // Reset for next turn
+        turningStarted = false;
         
         Serial.println("Turn complete!");
         
-        // Reset PID state for new path
+        // Reset encoders and PID for next path
+        resetLeftEncoderCnt();
+        resetRightEncoderCnt();
         lastError = 0;
         integral = 0;
         lastPIDTime = millis();
         
         state = State::PATH;
-    } else {
-        // Still turning - determine direction
-        if (error > 0) {
-            // Turn right (left forward, right backward)
-            setMotorDirection(LEFT_MOTOR, MOTOR_DIR_FORWARD);
-            setMotorDirection(RIGHT_MOTOR, MOTOR_DIR_BACKWARD);
-        } else {
-            // Turn left (left backward, right forward)
-            setMotorDirection(LEFT_MOTOR, MOTOR_DIR_BACKWARD);
-            setMotorDirection(RIGHT_MOTOR, MOTOR_DIR_FORWARD);
-        }
-        
-        setMotorSpeed(BOTH_MOTORS, TURN_SPEED);
     }
 }
 
