@@ -2,6 +2,18 @@
 #include "SimpleRSLK.h"
 #include "BNO055_support.h" //Contains the bridge code between the API and Arduino
 #include <Wire.h>
+#include <PID_v1.h>
+
+/*
+TODO
+
+make the front bumper toggle going and stop
+calibrate PID values
+Maybe slow down when close to wall
+spin in circle if no black detected
+Align with wall function to ensure accurate shooting
+
+*/
 
 struct bno055_t myBNO;
 struct bno055_euler myEulerData; // Structure to hold the Euler data
@@ -16,6 +28,8 @@ int currentCount;
 unsigned long lastTime = 0;
 String btnMsg = " ";
 
+bool shot = false;
+
 // Light sensor calibration values
 uint16_t sensorVal[LS_NUM_SENSORS];
 uint16_t sensorCalVal[LS_NUM_SENSORS];
@@ -26,18 +40,23 @@ uint16_t sensorMinVal[LS_NUM_SENSORS] = {756, 753, 630, 608, 513, 654, 634, 696}
 const int MAX_SPEED = 100; // TODO: Find max speed
 const int BASE_SPEED = 100; // TODO: Find base speed
 const int TURN_SPEED = 100; // TODO: Find max turn speed
-const int GOAL = 3500;  // Center position for line sensor
 const int SHOOTER_PIN = P10_4; // Pin to control the shooter mechanism
 
-// PID constants - tune these!
-const float KP = 0.06;    // Proportional gain
-const float KI = 0.005;  // Integral gain (start small)
-const float KD = 0.025;     // Derivative gain
+// PID constants
+const double KP = 0.06;
+const double KI = 0.005;
+const double KD = 0.025;
+const double LINE_POSITION_GOAL = 3500.0;
+const unsigned long PID_TELEMETRY_INTERVAL_MS = 50;
 
-// PID state variables
-float lastError = 0;
-float integral = 0;
-unsigned long lastPIDTime = 0;
+double linePidInput = 0.0;
+double linePidOutput = 0.0;
+double linePidSetpoint = LINE_POSITION_GOAL;
+
+PID linePid(&linePidInput, &linePidOutput, &linePidSetpoint, KP, KI, KD, DIRECT);
+
+void publishPidTelemetry();
+
 
 // Alignment Constants
 const float HEADING_TOLERANCE = 1;  // degrees // TODO: adjust as needed
@@ -86,9 +105,6 @@ void setup()
     pinMode(SHOOTER_PIN, OUTPUT);
     digitalWrite(SHOOTER_PIN, LOW);
 
-    // PID
-    lastPIDTime = millis();
-
     setupWaitBtn(LP_LEFT_BTN); // Left botton on the Launchpad
     setupLed(RED_LED);         // Use red led to signal waiting for button
 
@@ -96,6 +112,10 @@ void setup()
     setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
     enableMotor(BOTH_MOTORS);
     setMotorSpeed(BOTH_MOTORS, 0);
+
+    linePid.SetOutputLimits(-MAX_SPEED, MAX_SPEED);
+    linePid.SetSampleTime(10);
+    linePid.SetMode(AUTOMATIC);
 
     // Read initial heading
     delay(1000);
@@ -143,105 +163,45 @@ void start() {
     enableMotor(BOTH_MOTORS);
 
     // Reset PID state
-    lastError = 0;
-    integral = 0;
-    lastPIDTime = millis();
+    resetPID();
 
     state = State::PATH;
 }
 
 void path() {
-  /* Valid values are either:
-   *  DARK_LINE  if your floor is lighter than your line
-   *  LIGHT_LINE if your floor is darker than your line
-   */
-  uint8_t lineColor = DARK_LINE;
+    uint8_t lineColor = DARK_LINE;
 
-  readLineSensor(sensorVal);
+    readLineSensor(sensorVal);
+    readCalLineSensor(sensorVal, sensorCalVal, sensorMinVal, sensorMaxVal, lineColor);
 
-    /*
-    * Take current sensor values and adjust using previous calibration values
-    * Output: sensorCalVal
-    */
-    readCalLineSensor(
-        sensorVal,
-        sensorCalVal,
-        sensorMinVal,
-        sensorMaxVal,
-        lineColor
-    );
+    linePidInput = static_cast<double>(getLinePosition(sensorCalVal, lineColor));
+    linePidSetpoint = LINE_POSITION_GOAL;
 
-    uint32_t linePos = getLinePosition(sensorCalVal,lineColor);
+    bool pidUpdated = linePid.Compute();
 
-    // Calculate time delta for proper PID
-    unsigned long currentTime = millis();
-    float dt = (currentTime - lastPIDTime) / 1000.0;  // Convert to seconds
-    if (dt <= 0) { dt = 0.001; }
-    lastPIDTime = currentTime;
-
-    // PID calculation
-    int error = linePos - GOAL;
-    
-    // Proportional term
-    float P = KP * error;
-    
-    // Integral term (accumulated error over time)
-    integral += error * dt;
-    // Anti-windup: limit integral to prevent it from growing too large
-    integral = constrain(integral, -1000, 1000);
-    float I = KI * integral;
-    
-    // Derivative term (rate of change of error)
-    float derivative = (error - lastError) / dt;
-    float D = KD * derivative;
-    
-    // Total PID output
-    float motor_speed_delta = P + I + D;
-    
-    // Update last error for next iteration
-    lastError = error;
-
-    // Apply PID correction to base speed
-    int left_motor_speed = constrain(BASE_SPEED + motor_speed_delta, 0, MAX_SPEED);
-    int right_motor_speed = constrain(BASE_SPEED - motor_speed_delta, 0, MAX_SPEED);
+    int left_motor_speed = constrain(BASE_SPEED + linePidOutput, 0, MAX_SPEED);
+    int right_motor_speed = constrain(BASE_SPEED - linePidOutput, 0, MAX_SPEED);
 
     setMotorSpeed(LEFT_MOTOR, left_motor_speed);
     setMotorSpeed(RIGHT_MOTOR, right_motor_speed);
 
-    // Output PID data for Serial Plotter (format: label:value label:value)
-    Serial.print("Setpoint:");
-    Serial.print(GOAL);
-    Serial.print(",");
-    Serial.print("Current:");
-    Serial.print(linePos);
-    Serial.print(",");
-//    Serial.print("Error:");
-//    Serial.print(error);
-//    Serial.print(",");
-//    Serial.print("P:");
-//    Serial.print(P);
-//    Serial.print(",");
-//    Serial.print("I:");
-//    Serial.print(I);
-//    Serial.print(",");
-//    Serial.print("D:");
-//    Serial.print(D);
-//    Serial.print(",");
-    Serial.print("Output:");
-    Serial.println(motor_speed_delta);
+    if (pidUpdated) {
+        publishPidTelemetry();
+    }
 
     if (isBumperPressed()) {
-        setMotorSpeed(BOTH_MOTORS, 0);  // Stop motors
-        lastError = 0;
-        integral = 0;
-        lastPIDTime = millis();
-        state = State::SHOOT;
-    }
-    else if (isButtonPressed()) {
-        setMotorSpeed(BOTH_MOTORS, 0);  // Stop motors
-        lastError = 0;
-        integral = 0;
-        lastPIDTime = millis();
+        if (shot) {
+            setMotorSpeed(BOTH_MOTORS, 0);
+            resetPID();
+            state = State::DONE;
+        } else {
+            setMotorSpeed(BOTH_MOTORS, 0);
+            resetPID();
+            state = State::ALIGN;
+        }
+    } else if (isButtonPressed()) {
+        setMotorSpeed(BOTH_MOTORS, 0);
+        resetPID();
         state = State::DONE;
     }
 }
@@ -265,7 +225,7 @@ void align() {
     bno055_read_euler_hrp(&myEulerData);
     float currentHeading = float(myEulerData.h) / 16.00;
     float headingChange = abs(currentHeading - lastHeading);
-        Serial.print(",");
+    Serial.print(",");
     Serial.print("Angle:");
     Serial.print(currentHeading);
     Serial.print(",");
@@ -293,8 +253,35 @@ void shoot() {
     delay(300); // TODO: Adjust shoot time as needed
     digitalWrite(SHOOTER_PIN, LOW);
     delay(200); // TODO: Adjust shoot time as needed
-
+    shot = true;
     state = State::TURN;
+}
+
+void resetPID() {
+    linePid.SetMode(MANUAL);
+    linePidOutput = 0.0;
+    linePidInput = linePidSetpoint;
+    linePid.SetMode(AUTOMATIC);
+}
+
+void publishPidTelemetry() {
+    static unsigned long lastPublish = 0;
+    unsigned long now = millis();
+    if ((now - lastPublish) < PID_TELEMETRY_INTERVAL_MS) {
+        return;
+    }
+
+    // Serial Plotter friendly format: label:value pairs separated by tabs
+    Serial.print(F("PID_Input:"));
+    Serial.print(linePidInput);
+    Serial.print('\t');
+    Serial.print(F("PID_Setpoint:"));
+    Serial.print(linePidSetpoint);
+    Serial.print('\t');
+    Serial.print(F("PID_Output:"));
+    Serial.println(linePidOutput);
+
+    lastPublish = now;
 }
 
 void turn() {
@@ -335,10 +322,8 @@ void turn() {
         // Reset encoders and PID for next path
         resetLeftEncoderCnt();
         resetRightEncoderCnt();
-        lastError = 0;
-        integral = 0;
-        lastPIDTime = millis();
-        
+        resetPID();
+
         state = State::PATH;
     }
 }
@@ -348,7 +333,8 @@ void done() {
     disableMotor(BOTH_MOTORS);
     Serial.println("DONE - Press button to restart");
     delay(1000);
-    if (isButtonPressed()) {
+    if (isButtonPressed() || (isBumperPressed() && shot)) {
+        shot = false;
         state = State::START;
     }
 }
