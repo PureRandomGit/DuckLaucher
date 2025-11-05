@@ -172,7 +172,7 @@ void path() {
 
     uint32_t linePos = getLinePosition(sensorCalVal,lineColor);
 
-// Calculate time delta for proper PID
+    // Calculate time delta for proper PID
     unsigned long currentTime = millis();
     float dt = (currentTime - lastPIDTime) / 1000.0;  // Convert to seconds
     if (dt <= 0) { dt = 0.001; }
@@ -206,6 +206,28 @@ void path() {
 
     setMotorSpeed(LEFT_MOTOR, left_motor_speed);
     setMotorSpeed(RIGHT_MOTOR, right_motor_speed);
+
+    // Output PID data for Serial Plotter (format: label:value label:value)
+    Serial.print("Setpoint:");
+    Serial.print(GOAL);
+    Serial.print(",");
+    Serial.print("Current:");
+    Serial.print(linePos);
+    Serial.print(",");
+    Serial.print("Error:");
+    Serial.print(error);
+    Serial.print(",");
+    Serial.print("P:");
+    Serial.print(P);
+    Serial.print(",");
+    Serial.print("I:");
+    Serial.print(I);
+    Serial.print(",");
+    Serial.print("D:");
+    Serial.print(D);
+    Serial.print(",");
+    Serial.print("Output:");
+    Serial.println(motor_speed_delta);
 
     if (isBumperPressed()) {
         setMotorSpeed(BOTH_MOTORS, 0);  // Stop motors
@@ -260,12 +282,12 @@ void align() {
 }
 
 void shoot() {
-    delay(1000); // TODO: Adjust shoot time as needed
+    delay(500); // TODO: Adjust shoot time as needed
     Serial.println("Shooting duck...");
     digitalWrite(SHOOTER_PIN, HIGH);
     delay(400); // TODO: Adjust shoot time as needed
     digitalWrite(SHOOTER_PIN, LOW);
-    delay(1000); // TODO: Adjust shoot time as needed
+    delay(500); // TODO: Adjust shoot time as needed
 
     state = State::TURN;
 }
