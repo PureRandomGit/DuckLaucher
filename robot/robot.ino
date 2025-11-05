@@ -1,3 +1,4 @@
+
 #include "SimpleRSLK.h"
 #include "BNO055_support.h" //Contains the bridge code between the API and Arduino
 #include <Wire.h>
@@ -23,15 +24,15 @@ uint16_t sensorMinVal[LS_NUM_SENSORS] = {756, 753, 630, 608, 513, 654, 634, 696}
 
 // Robot Constants
 const int MAX_SPEED = 100; // TODO: Find max speed
-const int BASE_SPEED = 90; // TODO: Find base speed
-const int TURN_SPEED = 50; // TODO: Find max turn speed
+const int BASE_SPEED = 100; // TODO: Find base speed
+const int TURN_SPEED = 100; // TODO: Find max turn speed
 const int GOAL = 3500;  // Center position for line sensor
 const int SHOOTER_PIN = P10_4; // Pin to control the shooter mechanism
 
 // PID constants - tune these!
-const float KP = 0.043;    // Proportional gain
-const float KI = 0.00001;  // Integral gain (start small)
-const float KD = 0.005;     // Derivative gain
+const float KP = 0.06;    // Proportional gain
+const float KI = 0.005;  // Integral gain (start small)
+const float KD = 0.025;     // Derivative gain
 
 // PID state variables
 float lastError = 0;
@@ -40,7 +41,7 @@ unsigned long lastPIDTime = 0;
 
 // Alignment Constants
 const float HEADING_TOLERANCE = 1;  // degrees // TODO: adjust as needed
-const unsigned long TIMEOUT = 1000;   // .5 second timeout // TODO: adjust as needed
+const unsigned long TIMEOUT = 3000;   // .5 second timeout // TODO: adjust as needed
 const int PUSH_SPEED = 30; // TODO: adjust as needed
 
 enum class State {
@@ -108,7 +109,7 @@ void setup()
 
 void loop()
 {
-    delay(10); // TODO: See of this can be removed
+    delay(5); // TODO: See of this can be removed
 
     // Prints state every 100ms (10Hz)
     if ((millis() - lastTime) >= 100)
@@ -214,18 +215,18 @@ void path() {
     Serial.print("Current:");
     Serial.print(linePos);
     Serial.print(",");
-    Serial.print("Error:");
-    Serial.print(error);
-    Serial.print(",");
-    Serial.print("P:");
-    Serial.print(P);
-    Serial.print(",");
-    Serial.print("I:");
-    Serial.print(I);
-    Serial.print(",");
-    Serial.print("D:");
-    Serial.print(D);
-    Serial.print(",");
+//    Serial.print("Error:");
+//    Serial.print(error);
+//    Serial.print(",");
+//    Serial.print("P:");
+//    Serial.print(P);
+//    Serial.print(",");
+//    Serial.print("I:");
+//    Serial.print(I);
+//    Serial.print(",");
+//    Serial.print("D:");
+//    Serial.print(D);
+//    Serial.print(",");
     Serial.print("Output:");
     Serial.println(motor_speed_delta);
 
@@ -234,7 +235,7 @@ void path() {
         lastError = 0;
         integral = 0;
         lastPIDTime = millis();
-        state = State::ALIGN;
+        state = State::SHOOT;
     }
     else if (isButtonPressed()) {
         setMotorSpeed(BOTH_MOTORS, 0);  // Stop motors
@@ -264,6 +265,10 @@ void align() {
     bno055_read_euler_hrp(&myEulerData);
     float currentHeading = float(myEulerData.h) / 16.00;
     float headingChange = abs(currentHeading - lastHeading);
+        Serial.print(",");
+    Serial.print("Angle:");
+    Serial.print(currentHeading);
+    Serial.print(",");
     
     if (headingChange < HEADING_TOLERANCE || (millis() - alignStartTime) >= TIMEOUT) {
         setMotorSpeed(BOTH_MOTORS, 0);
@@ -285,9 +290,9 @@ void shoot() {
     delay(500); // TODO: Adjust shoot time as needed
     Serial.println("Shooting duck...");
     digitalWrite(SHOOTER_PIN, HIGH);
-    delay(400); // TODO: Adjust shoot time as needed
+    delay(300); // TODO: Adjust shoot time as needed
     digitalWrite(SHOOTER_PIN, LOW);
-    delay(500); // TODO: Adjust shoot time as needed
+    delay(200); // TODO: Adjust shoot time as needed
 
     state = State::TURN;
 }
@@ -342,7 +347,7 @@ void done() {
     setMotorSpeed(BOTH_MOTORS, 0);
     disableMotor(BOTH_MOTORS);
     Serial.println("DONE - Press button to restart");
-    
+    delay(1000);
     if (isButtonPressed()) {
         state = State::START;
     }
