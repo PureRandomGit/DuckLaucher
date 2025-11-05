@@ -31,7 +31,7 @@ const int SHOOTER_PIN = P8_6; // Pin to control the shooter mechanism
 // PID constants - tune these!
 const float KP = 0.05;    // Proportional gain
 const float KI = 0.0001;  // Integral gain (start small)
-const float KD = 0.5;     // Derivative gain
+const float KD = 0.05;     // Derivative gain
 
 // PID state variables
 float lastError = 0;
@@ -270,15 +270,17 @@ void shoot() {
 
 void turn() {
     static bool turningInitialized = false;
-    static int targetHeading = 0;
+    static float targetHeading = 0;
     
     if (!turningInitialized) {
-        // Calculate target heading (180 degrees from initial)
+        // Calculate target heading (180 degrees from current)
         bno055_read_euler_hrp(&myEulerData);
-        int currentHeading = float(myEulerData.h) / 16.00;
-        targetHeading = (currentHeading + 180) % 360;
+        float currentHeading = float(myEulerData.h) / 16.00;
+        targetHeading = fmod(currentHeading + 180.0, 360.0);
         
-        Serial.print("Turning to: ");
+        Serial.print("Starting turn - Current: ");
+        Serial.print(currentHeading);
+        Serial.print(" | Turning to: ");
         Serial.println(targetHeading);
         
         turningInitialized = true;
@@ -286,10 +288,10 @@ void turn() {
     
     // Read current heading
     bno055_read_euler_hrp(&myEulerData);
-    int currentHeading = float(myEulerData.h) / 16.00;
+    float currentHeading = float(myEulerData.h) / 16.00;
     
     // Calculate shortest angle difference
-    int error = calculateAngleDifference(targetHeading, currentHeading);
+    float error = calculateAngleDifference(targetHeading, currentHeading);
     
     Serial.print("Current: ");
     Serial.print(currentHeading);
@@ -299,11 +301,11 @@ void turn() {
     Serial.println(error);
     
     // Check if we've reached target (within tolerance)
-    if (abs(error) < 3) {
+    if (abs(error) < 5) {  // Increased tolerance to 5 degrees
         // Turn complete
         setMotorSpeed(BOTH_MOTORS, 0);
         setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
-        turningInitialized = false;
+        turningInitialized = false;  // Reset for next turn
         
         Serial.println("Turn complete!");
         
@@ -340,10 +342,10 @@ void done() {
 }
 
 // Helper functions
-int calculateAngleDifference(int target, int current) {
-    int delta = (target - current + 360) % 360;
-    if (delta > 180) {
-        delta = delta - 360;
+float calculateAngleDifference(float target, float current) {
+    float delta = fmod((target - current + 360.0), 360.0);
+    if (delta > 180.0) {
+        delta = delta - 360.0;
     }
     return delta;
 }
