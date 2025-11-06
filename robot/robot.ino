@@ -59,9 +59,8 @@ void publishPidTelemetry();
 
 
 // Alignment Constants
-const float HEADING_TOLERANCE = 1;  // degrees // TODO: adjust as needed
-const unsigned long TIMEOUT = 3000;   // .5 second timeout // TODO: adjust as needed
-const int PUSH_SPEED = 30; // TODO: adjust as needed
+const float HEADING_TOLERANCE = 3.0f;  // degrees of acceptable alignment
+const unsigned long TIMEOUT = 3000;   // Timeout while trying to align (ms)
 
 enum class State {
     START,
@@ -207,43 +206,48 @@ void path() {
 }
 
 void align() {
-    static unsigned long alignStartTime = 0;
     static bool aligning = false;
-    static float lastHeading = 0;
-        
+    static unsigned long alignStartTime = 0;
+
     if (!aligning) {
-        alignStartTime = millis();
-        bno055_read_euler_hrp(&myEulerData);
-        lastHeading = float(myEulerData.h) / 16.00;
         aligning = true;
-        
-        setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
-        setMotorSpeed(BOTH_MOTORS, PUSH_SPEED);
-        Serial.println("Aligning against wall...");
+        alignStartTime = millis();
+        Serial.println("Aligning to 0 degrees...");
     }
-    
-    bno055_read_euler_hrp(&myEulerData);
-    float currentHeading = float(myEulerData.h) / 16.00;
-    float headingChange = abs(currentHeading - lastHeading);
-    Serial.print(",");
-    Serial.print("Angle:");
+
+    float currentHeading = readHeadingDegrees();
+    float headingError = calculateAngleDifference(0.0f, currentHeading);
+
+    Serial.print(F("AlignHeading:"));
     Serial.print(currentHeading);
-    Serial.print(",");
-    
-    if (headingChange < HEADING_TOLERANCE || (millis() - alignStartTime) >= TIMEOUT) {
+    Serial.print('\t');
+    Serial.print(F("AlignError:"));
+    Serial.println(headingError);
+
+    if (headingError > HEADING_TOLERANCE) {
+        setMotorDirection(LEFT_MOTOR, MOTOR_DIR_FORWARD);
+        setMotorDirection(RIGHT_MOTOR, MOTOR_DIR_BACKWARD);
+        setMotorSpeed(BOTH_MOTORS, TURN_SPEED);
+    } else if (headingError < -HEADING_TOLERANCE) {
+        setMotorDirection(LEFT_MOTOR, MOTOR_DIR_BACKWARD);
+        setMotorDirection(RIGHT_MOTOR, MOTOR_DIR_FORWARD);
+        setMotorSpeed(BOTH_MOTORS, TURN_SPEED);
+    } else {
         setMotorSpeed(BOTH_MOTORS, 0);
+        setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
         aligning = false;
-        
-        if (headingChange < HEADING_TOLERANCE) {
-            Serial.println("Aligned!");
-        } else {
-            Serial.println("Alignment timeout");
-        }
-        
+        Serial.println("Heading aligned - ready to shoot");
+        state = State::SHOOT;
+        return;
+    }
+
+    if ((millis() - alignStartTime) >= TIMEOUT) {
+        setMotorSpeed(BOTH_MOTORS, 0);
+        setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
+        aligning = false;
+        Serial.println("Alignment timeout");
         state = State::SHOOT;
     }
-    
-    lastHeading = currentHeading;
 }
 
 void shoot() {
@@ -340,10 +344,18 @@ void done() {
 }
 
 // Helper functions
+float readHeadingDegrees() {
+    bno055_read_euler_hrp(&myEulerData);
+    return float(myEulerData.h) / 16.0f;
+}
+
 float calculateAngleDifference(float target, float current) {
-    float delta = fmod((target - current + 360.0), 360.0);
-    if (delta > 180.0) {
-        delta = delta - 360.0;
+    float delta = target - current;
+    while (delta > 180.0f) {
+        delta -= 360.0f;
+    }
+    while (delta < -180.0f) {
+        delta += 360.0f;
     }
     return delta;
 }
