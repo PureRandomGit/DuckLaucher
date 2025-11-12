@@ -34,18 +34,18 @@ bool shot = false;
 uint16_t sensorVal[LS_NUM_SENSORS];
 uint16_t sensorCalVal[LS_NUM_SENSORS];
 uint16_t sensorMaxVal[LS_NUM_SENSORS] = {2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500};
-uint16_t sensorMinVal[LS_NUM_SENSORS] = {756, 753, 630, 608, 513, 654, 634, 696};
+uint16_t sensorMinVal[LS_NUM_SENSORS] = {828, 730, 655, 633, 582, 715, 520, 742};
 
 // Robot Constants
 const int MAX_SPEED = 100; // TODO: Find max speed
 const int BASE_SPEED = 90; // TODO: Find base speed
-const int TURN_SPEED = 80; // TODO: Find max turn speed
+const int TURN_SPEED = 100; // TODO: Find max turn speed
 const int SHOOTER_PIN = P10_4; // Pin to control the shooter mechanism
 
 // PID constants
-const float KP = 0.06;    // Proportional gain
-const float KI = 0.005;  // Integral gain (start small)
-const float KD = 0.025;     // Derivative gain
+const float KP = 0.05;    // Proportional gain // POGGIES: 0.05, 0.001, 0.01
+const float KI = 0.0014;  // Integral gain (start small)
+const float KD = 0.01;     // Derivative gain
 const double LINE_POSITION_GOAL = 3500.0;
 const unsigned long PID_TELEMETRY_INTERVAL_MS = 50;
 
@@ -60,6 +60,10 @@ double linePidOutput = 0.0;
 double linePidSetpoint = LINE_POSITION_GOAL;
 
 PID linePid(&linePidInput, &linePidOutput, &linePidSetpoint, KP, KI, KD, DIRECT);
+
+boolean smacked = false;
+bool bumperPreviouslyPressed = false; // Tracks last bumper state to detect new hits
+bool pendingDoneAfterTurn = false;    // Signals that the next turn should end in DONE
 
 void publishPidTelemetry();
 
@@ -96,7 +100,6 @@ void setup()
     // Configuration to NDoF mode
     bno055_set_operation_mode(OPERATION_MODE_NDOF);
 
-    delay(1); // Wait for gyro to settle
     Serial.begin(115200);
 
     setupRSLK();
@@ -123,7 +126,7 @@ void setup()
     linePid.SetMode(AUTOMATIC);
 
     // Read initial heading
-    delay(1000);
+    delay(500);
     bno055_read_euler_hrp(&myEulerData); // Update Euler data into the structure
     initialHeading = float(myEulerData.h) / 16.00;
     Serial.print("Initial Heading(Yaw): "); // To read out the Heading (Yaw)
@@ -139,7 +142,7 @@ void loop()
     // Prints state every 100ms (10Hz)
     if ((millis() - lastTime) >= 100)
     {
-        printState(state);
+        // printState(state);
         lastTime = millis();
     }
 
@@ -155,7 +158,7 @@ void loop()
 }
 
 void start() {
-    Serial.println("Start");
+    // Serial.println("Start");
     waitBtnPressed(LP_LEFT_BTN, "\nPush left button on Launchpad to start challenge.\n", RED_LED);
     delay(100); // Debounce/Settle delay
 
@@ -171,11 +174,14 @@ void start() {
     // Reset PID state
     resetPID();
 
+    bumperPreviouslyPressed = isBumperPressed();
+    pendingDoneAfterTurn = false;
+
     state = State::PATH;
 }
 
 void restart() {
-    Serial.println("restart");
+    // Serial.println("restart");
     delay(100); // Debounce/Settle delay
 
     // Reset everything
@@ -189,6 +195,9 @@ void restart() {
 
     // Reset PID state
     resetPID();
+
+    bumperPreviouslyPressed = isBumperPressed();
+    pendingDoneAfterTurn = false;
 
     state = State::PATH;
 }
@@ -215,6 +224,10 @@ void path() {
     );
 
     uint32_t linePos = getLinePosition(sensorCalVal,lineColor);
+
+    bool bumperPressed = isBumperPressed();
+    bool newBumperPress = bumperPressed && !bumperPreviouslyPressed;
+    bumperPreviouslyPressed = bumperPressed;
 
     // Calculate time delta for proper PID
     unsigned long currentTime = millis();
@@ -252,30 +265,31 @@ void path() {
     setMotorSpeed(RIGHT_MOTOR, right_motor_speed);
 
     // Output PID data for Serial Plotter (format: label:value label:value)
-    Serial.print("Setpoint:");
-    Serial.print(GOAL);
-    Serial.print(",");
-    Serial.print("Current:");
-    Serial.print(linePos);
-    Serial.print(",");
+    // Serial.print("Setpoint:");
+    // Serial.print(GOAL);
+    // Serial.print(",");
+    // Serial.print("Current:");
+    // Serial.print(linePos);
+    // Serial.print(",");
 
-    Serial.print("Output:");
-    Serial.println(motor_speed_delta);
+    // Serial.print("Output:");
+    // Serial.println(motor_speed_delta);
 
-    if (isBumperPressed()) {
+    if (newBumperPress) {
         if (shot) {
             setMotorSpeed(BOTH_MOTORS, 0);  // Stop motors
             lastError = 0;
             integral = 0;
             lastPIDTime = millis();
-            delay(300);
-            state = State::DONE;
+            delay(50);
+            pendingDoneAfterTurn = true;
+            state = State::TURN;
         } else {
             setMotorSpeed(BOTH_MOTORS, 0);  // Stop motors
             lastError = 0;
             integral = 0;
             lastPIDTime = millis();
-            delay(300);
+            delay(400);
             state = State::SHOOT;
         }
     }
@@ -299,17 +313,17 @@ void align() {
     if (!aligning) {
         aligning = true;
         alignStartTime = millis();
-        Serial.println("Aligning to 0 degrees...");
+        // Serial.println("Aligning to 0 degrees...");
     }
 
     float currentHeading = readHeadingDegrees();
     float headingError = calculateAngleDifference(angle, currentHeading);
 
-    Serial.print(F("AlignHeading:"));
-    Serial.print(currentHeading);
-    Serial.print('\t');
-    Serial.print(F("AlignError:"));
-    Serial.println(headingError);
+    // Serial.print(F("AlignHeading:"));
+    // Serial.print(currentHeading);
+    // Serial.print('\t');
+    // Serial.print(F("AlignError:"));
+    // Serial.println(headingError);
 
     if (headingError > HEADING_TOLERANCE) {
         setMotorDirection(LEFT_MOTOR, MOTOR_DIR_FORWARD);
@@ -323,7 +337,7 @@ void align() {
         setMotorSpeed(BOTH_MOTORS, 0);
         setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
         aligning = false;
-        Serial.println("Heading aligned - ready to shoot");
+        // Serial.println("Heading aligned - ready to shoot");
         state = State::SHOOT;
         return;
     }
@@ -332,18 +346,18 @@ void align() {
         setMotorSpeed(BOTH_MOTORS, 0);
         setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
         aligning = false;
-        Serial.println("Alignment timeout");
+        // Serial.println("Alignment timeout");
         state = State::SHOOT;
     }
 }
 
 void shoot() {
     delay(100); // TODO: Adjust shoot time as needed
-    Serial.println("Shooting duck...");
+    // Serial.println("Shooting duck...");
     digitalWrite(SHOOTER_PIN, HIGH);
     delay(300); // TODO: Adjust shoot time as needed
     digitalWrite(SHOOTER_PIN, LOW);
-    delay(100); // TODO: Adjust shoot time as needed
+    delay(50); // TODO: Adjust shoot time as needed
     shot = true;
     state = State::TURN;
 }
@@ -363,14 +377,14 @@ void publishPidTelemetry() {
     }
 
     // Serial Plotter friendly format: label:value pairs separated by tabs
-    Serial.print(F("PID_Input:"));
-    Serial.print(linePidInput);
-    Serial.print('\t');
-    Serial.print(F("PID_Setpoint:"));
-    Serial.print(linePidSetpoint);
-    Serial.print('\t');
-    Serial.print(F("PID_Output:"));
-    Serial.println(linePidOutput);
+    // Serial.print(F("PID_Input:"));
+    // Serial.print(linePidInput);
+    // Serial.print('\t');
+    // Serial.print(F("PID_Setpoint:"));
+    // Serial.print(linePidSetpoint);
+    // Serial.print('\t');
+    // Serial.print(F("PID_Output:"));
+    // Serial.println(linePidOutput);
 
     lastPublish = now;
 }
@@ -394,7 +408,7 @@ void turn() {
         setMotorSpeed(BOTH_MOTORS, TURN_SPEED);
         
         turningStarted = true;
-        Serial.println("Starting 180 turn");
+        // Serial.println("Starting 180 turn");
     }
     
     // Check if we've turned enough
@@ -408,21 +422,26 @@ void turn() {
         setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
         turningStarted = false;
         
-        Serial.println("Turn complete!");
+        // Serial.println("Turn complete!");
         
         // Reset encoders and PID for next path
         resetLeftEncoderCnt();
         resetRightEncoderCnt();
         resetPID();
 
-        state = State::PATH;
+        if (pendingDoneAfterTurn) {
+            pendingDoneAfterTurn = false;
+            state = State::DONE;
+        } else {
+            state = State::PATH;
+        }
     }
 }
 
 void done() {
     setMotorSpeed(BOTH_MOTORS, 0);
     // disableMotor(BOTH_MOTORS);
-    Serial.println("DONE - Press button to restart");
+    // Serial.println("DONE - Press button to restart");
     // delay(1000);
     if (isButtonPressed() || (isBumperPressed() )) {
         shot = false;
