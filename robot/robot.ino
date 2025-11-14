@@ -43,8 +43,8 @@ const int TURN_SPEED = 100; // TODO: Find max turn speed
 const int SHOOTER_PIN = P10_4; // Pin to control the shooter mechanism
 
 // PID constants
-const float KP = 0.05;    // Proportional gain // POGGIES: 0.05, 0.001, 0.01
-const float KI = 0.0014;  // Integral gain (start small)
+const float KP = 0.05;    // Proportional gain // POGGIES: 0.05, 0.001 up to 0.0012, 0.01
+const float KI = 0.001;  // Integral gain (start small)
 const float KD = 0.01;     // Derivative gain
 const double LINE_POSITION_GOAL = 3500.0;
 const unsigned long PID_TELEMETRY_INTERVAL_MS = 50;
