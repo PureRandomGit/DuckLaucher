@@ -12,8 +12,10 @@ String btnMsg = " ";
 
 bool shot = false;
 
-bool slowDown = false; // Set to true to slow down on wall approach
+bool hasShooter = true;
 
+bool slowDown = false; // Set to true to slow down on wall approach
+bool returning = false;
 float timeToWall = 2.0;
 
 unsigned long pathStateStartTime = 0; // Timestamp for PATH state entry
@@ -172,6 +174,7 @@ void restart() {
 
     pathStateStartTime = millis();
     lastPIDTime = pathStateStartTime;
+    returning = false;
     state = State::PATH;
 }
 
@@ -209,7 +212,7 @@ void path() {
     lastPIDTime = currentTime;
 
     int baseSpeed = BASE_SPEED;
-    if (slowDown) {
+    if (slowDown && !returning) {
         unsigned long slowDownDelayMs = timeToWall > 0.0f
             ? static_cast<unsigned long>(timeToWall * 1000.0f)
             : 0UL;
@@ -276,13 +279,16 @@ void path() {
 
 void shoot() {
     delay(100);
-    // Serial.println("Shooting duck...");
-    digitalWrite(SHOOTER_PIN, HIGH);
-    delay(300);
-    digitalWrite(SHOOTER_PIN, LOW);
-    delay(50);
+    if (hasShooter) {
+        // Serial.println("Shooting duck...");
+        digitalWrite(SHOOTER_PIN, HIGH);
+        delay(300);
+        digitalWrite(SHOOTER_PIN, LOW);
+        delay(50);
+    }
     shot = true;
     state = State::TURN;
+    returning = true;
 }
 
 void turn() {
