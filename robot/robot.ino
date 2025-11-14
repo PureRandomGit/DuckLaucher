@@ -12,6 +12,12 @@ String btnMsg = " ";
 
 bool shot = false;
 
+bool slowDown = false; // Set to true to slow down on wall approach
+
+float timeToWall = 2.0;
+
+unsigned long pathStateStartTime = 0; // Timestamp for PATH state entry
+
 // Light sensor calibration values
 uint16_t sensorVal[LS_NUM_SENSORS];
 uint16_t sensorCalVal[LS_NUM_SENSORS];
@@ -22,6 +28,7 @@ uint16_t sensorMinVal[LS_NUM_SENSORS] = {828, 730, 655, 633, 582, 715, 520, 742}
 const int MAX_SPEED = 100;
 const int BASE_SPEED = 90;
 const int TURN_SPEED = 100;
+const int SLOW_SPEED = 60; // Reduced speed when approaching the wall
 const int SHOOTER_PIN = P10_4; // Pin to control the shooter mechanism
 
 // PID constants
@@ -108,8 +115,6 @@ void setup()
 
 void loop()
 {
-    // delay(5); // TODO: See of this can be removed
-
     // Prints state every 100ms (10Hz)
     if ((millis() - lastTime) >= 100)
     {
@@ -144,6 +149,8 @@ void start() {
     bumperPreviouslyPressed = isBumperPressed();
     pendingDoneAfterTurn = false;
 
+    pathStateStartTime = millis();
+    lastPIDTime = pathStateStartTime;
     state = State::PATH;
 }
 
@@ -163,6 +170,8 @@ void restart() {
     bumperPreviouslyPressed = isBumperPressed();
     pendingDoneAfterTurn = false;
 
+    pathStateStartTime = millis();
+    lastPIDTime = pathStateStartTime;
     state = State::PATH;
 }
 
@@ -199,6 +208,16 @@ void path() {
     if (dt <= 0) { dt = 0.001; }
     lastPIDTime = currentTime;
 
+    int baseSpeed = BASE_SPEED;
+    if (slowDown) {
+        unsigned long slowDownDelayMs = timeToWall > 0.0f
+            ? static_cast<unsigned long>(timeToWall * 1000.0f)
+            : 0UL;
+        if ((currentTime - pathStateStartTime) >= slowDownDelayMs) {
+            baseSpeed = SLOW_SPEED;
+        }
+    }
+
     // PID calculation
     int error = linePos - GOAL;
     
@@ -221,8 +240,8 @@ void path() {
     lastError = error;
 
     // Apply PID correction to base speed
-    int left_motor_speed = constrain(BASE_SPEED + motor_speed_delta, 0, MAX_SPEED);
-    int right_motor_speed = constrain(BASE_SPEED - motor_speed_delta, 0, MAX_SPEED);
+    int left_motor_speed = constrain(int(baseSpeed + motor_speed_delta), 0, MAX_SPEED);
+    int right_motor_speed = constrain(int(baseSpeed - motor_speed_delta), 0, MAX_SPEED);
 
     setMotorSpeed(LEFT_MOTOR, left_motor_speed);
     setMotorSpeed(RIGHT_MOTOR, right_motor_speed);
@@ -308,6 +327,8 @@ void turn() {
             pendingDoneAfterTurn = false;
             state = State::DONE;
         } else {
+            pathStateStartTime = millis();
+            lastPIDTime = pathStateStartTime;
             state = State::PATH;
         }
     }
