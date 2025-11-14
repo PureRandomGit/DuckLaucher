@@ -1,30 +1,12 @@
-
-include "SimpleRSLK.h"
-include "BNO055_support.h" //Contains the bridge code between the API and Arduino
-include <Wire.h>
-include <PID_v1.h>
-
-/*
-TODO
-
-make the front bumper toggle going and stop
-calibrate PID values
-Maybe slow down when close to wall
-spin in circle if no black detected
-Align with wall function to ensure accurate shooting
-
-*/
+#include "SimpleRSLK.h"
+#include "BNO055_support.h"
+#include <Wire.h>
 
 struct bno055_t myBNO;
-struct bno055_euler myEulerData; // Structure to hold the Euler data
-
-float wheelDiameter = 2.5;  // Diameter of Romi wheels in inches
-int cntPerRevolution = 360; // Number of encoder (rising) pulses every time the wheel turns completely
+struct bno055_euler myEulerData;
 
 float initialHeading;
 
-float crashedCount;
-int currentCount;
 unsigned long lastTime = 0;
 String btnMsg = " ";
 
@@ -37,15 +19,15 @@ uint16_t sensorMaxVal[LS_NUM_SENSORS] = {2500, 2500, 2500, 2500, 2500, 2500, 250
 uint16_t sensorMinVal[LS_NUM_SENSORS] = {828, 730, 655, 633, 582, 715, 520, 742};
 
 // Robot Constants
-const int MAX_SPEED = 100; // TODO: Find max speed
-const int BASE_SPEED = 90; // TODO: Find base speed
-const int TURN_SPEED = 100; // TODO: Find max turn speed
+const int MAX_SPEED = 100;
+const int BASE_SPEED = 90;
+const int TURN_SPEED = 100;
 const int SHOOTER_PIN = P10_4; // Pin to control the shooter mechanism
 
 // PID constants
-const float KP = 00.5;    // Proportional gain // POGGIES: 0.05, 0.001 up to 0.0012, 0.01
-const float KI = 00.01;  // Integral gain (start small)
-const float KD = 00.1;     // Derivative gain
+const float KP = 0.05;// POGGIES: 0.05, 0.001 up to 0.0012, 0.01
+const float KI = 0.001;
+const float KD = 0.01;
 const double LINE_POSITION_GOAL = 3500.0;
 const unsigned long PID_TELEMETRY_INTERVAL_MS = 50;
 
@@ -54,12 +36,6 @@ const int GOAL = 3500;  // Center position for line sensor
 float lastError = 0;
 float integral = 0;
 unsigned long lastPIDTime = 0;
-
-double linePidInput = 0.0;
-double linePidOutput = 0.0;
-double linePidSetpoint = LINE_POSITION_GOAL;
-
-PID linePid(&linePidInput, &linePidOutput, &linePidSetpoint, KP, KI, KD, DIRECT);
 
 boolean smacked = false;
 bool bumperPreviouslyPressed = false; // Tracks last bumper state to detect new hits
@@ -75,7 +51,6 @@ enum class State {
     START,
     RESTART,
     PATH,
-    ALIGN,
     SHOOT,
     TURN,
     DONE
@@ -121,10 +96,6 @@ void setup()
     enableMotor(BOTH_MOTORS);
     setMotorSpeed(BOTH_MOTORS, 0);
 
-    linePid.SetOutputLimits(-MAX_SPEED, MAX_SPEED);
-    linePid.SetSampleTime(10);
-    linePid.SetMode(AUTOMATIC);
-
     // Read initial heading
     delay(500);
     bno055_read_euler_hrp(&myEulerData); // Update Euler data into the structure
@@ -150,7 +121,6 @@ void loop()
         case State::START:    start();    break;
         case State::RESTART:  restart();    break;
         case State::PATH:     path();     break;
-        case State::ALIGN:    align();    break;
         case State::SHOOT:    shoot();    break;
         case State::TURN:     turn();     break;
         case State::DONE:     done();     break;
@@ -171,9 +141,6 @@ void start() {
     // Initialize motors
     enableMotor(BOTH_MOTORS);
 
-    // Reset PID state
-    resetPID();
-
     bumperPreviouslyPressed = isBumperPressed();
     pendingDoneAfterTurn = false;
 
@@ -192,9 +159,6 @@ void restart() {
 
     // Initialize motors
     enableMotor(BOTH_MOTORS);
-
-    // Reset PID state
-    resetPID();
 
     bumperPreviouslyPressed = isBumperPressed();
     pendingDoneAfterTurn = false;
@@ -241,9 +205,8 @@ void path() {
     // Proportional term
     float P = KP * error;
     
-    // Integral term (accumulated error over time)
+    // Integral term
     integral += error * dt;
-    // Anti-windup: limit integral to prevent it from growing too large
     integral = constrain(integral, -1000, 1000);
     float I = KI * integral;
     
@@ -263,17 +226,6 @@ void path() {
 
     setMotorSpeed(LEFT_MOTOR, left_motor_speed);
     setMotorSpeed(RIGHT_MOTOR, right_motor_speed);
-
-    // Output PID data for Serial Plotter (format: label:value label:value)
-    // Serial.print("Setpoint:");
-    // Serial.print(GOAL);
-    // Serial.print(",");
-    // Serial.print("Current:");
-    // Serial.print(linePos);
-    // Serial.print(",");
-
-    // Serial.print("Output:");
-    // Serial.println(motor_speed_delta);
 
     if (newBumperPress) {
         if (shot) {
@@ -303,90 +255,15 @@ void path() {
     }
 }
 
-void align() {
-    static bool aligning = false;
-    static unsigned long alignStartTime = 0;
-    static float angle = 0;
-    const float HEADING_TOLERANCE = 2.0f;  // degrees of acceptable alignment
-    const unsigned long TIMEOUT = 3000;   
-
-    if (!aligning) {
-        aligning = true;
-        alignStartTime = millis();
-        // Serial.println("Aligning to 0 degrees...");
-    }
-
-    float currentHeading = readHeadingDegrees();
-    float headingError = calculateAngleDifference(angle, currentHeading);
-
-    // Serial.print(F("AlignHeading:"));
-    // Serial.print(currentHeading);
-    // Serial.print('\t');
-    // Serial.print(F("AlignError:"));
-    // Serial.println(headingError);
-
-    if (headingError > HEADING_TOLERANCE) {
-        setMotorDirection(LEFT_MOTOR, MOTOR_DIR_FORWARD);
-        setMotorDirection(RIGHT_MOTOR, MOTOR_DIR_BACKWARD);
-        setMotorSpeed(BOTH_MOTORS, TURN_SPEED);
-    } else if (headingError < -HEADING_TOLERANCE) {
-        setMotorDirection(LEFT_MOTOR, MOTOR_DIR_BACKWARD);
-        setMotorDirection(RIGHT_MOTOR, MOTOR_DIR_FORWARD);
-        setMotorSpeed(BOTH_MOTORS, TURN_SPEED);
-    } else {
-        setMotorSpeed(BOTH_MOTORS, 0);
-        setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
-        aligning = false;
-        // Serial.println("Heading aligned - ready to shoot");
-        state = State::SHOOT;
-        return;
-    }
-
-    if ((millis() - alignStartTime) >= TIMEOUT) {
-        setMotorSpeed(BOTH_MOTORS, 0);
-        setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
-        aligning = false;
-        // Serial.println("Alignment timeout");
-        state = State::SHOOT;
-    }
-}
-
 void shoot() {
-    delay(100); // TODO: Adjust shoot time as needed
+    delay(100);
     // Serial.println("Shooting duck...");
     digitalWrite(SHOOTER_PIN, HIGH);
-    delay(300); // TODO: Adjust shoot time as needed
+    delay(300);
     digitalWrite(SHOOTER_PIN, LOW);
-    delay(50); // TODO: Adjust shoot time as needed
+    delay(50);
     shot = true;
     state = State::TURN;
-}
-
-void resetPID() {
-    linePid.SetMode(MANUAL);
-    linePidOutput = 0.0;
-    linePidInput = linePidSetpoint;
-    linePid.SetMode(AUTOMATIC);
-}
-
-void publishPidTelemetry() {
-    static unsigned long lastPublish = 0;
-    unsigned long now = millis();
-    if ((now - lastPublish) < PID_TELEMETRY_INTERVAL_MS) {
-        return;
-    }
-
-    // Serial Plotter friendly format: label:value pairs separated by tabs
-    // Serial.print(F("PID_Input:"));
-    // Serial.print(linePidInput);
-    // Serial.print('\t');
-    // Serial.print(F("PID_Setpoint:"));
-    // Serial.print(linePidSetpoint);
-    // Serial.print('\t');
-    // Serial.print(F("PID_Output:"));
-    // Serial.println(linePidOutput);
-
-    lastPublish = now;
 }
 
 void turn() {
@@ -408,7 +285,6 @@ void turn() {
         setMotorSpeed(BOTH_MOTORS, TURN_SPEED);
         
         turningStarted = true;
-        // Serial.println("Starting 180 turn");
     }
     
     // Check if we've turned enough
@@ -427,7 +303,6 @@ void turn() {
         // Reset encoders and PID for next path
         resetLeftEncoderCnt();
         resetRightEncoderCnt();
-        resetPID();
 
         if (pendingDoneAfterTurn) {
             pendingDoneAfterTurn = false;
