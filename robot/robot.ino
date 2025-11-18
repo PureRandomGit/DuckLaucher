@@ -8,7 +8,7 @@ bool shot = false;
 uint16_t sensorVal[LS_NUM_SENSORS];
 uint16_t sensorCalVal[LS_NUM_SENSORS];
 uint16_t sensorMaxVal[LS_NUM_SENSORS] = {2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500};
-uint16_t sensorMinVal[LS_NUM_SENSORS] = {828, 730, 655, 633, 582, 715, 520, 742};
+uint16_t sensorMinVal[LS_NUM_SENSORS] = {629, 682, 547, 802, 547, 697, 608, 1010};
 
 // Robot Constants
 const int MAX_SPEED = 100;
@@ -18,8 +18,9 @@ const int SHOOTER_PIN = P10_4; // Pin to control the shooter mechanism
 
 // PID constants
 const float KP = 0.05;
-const float KI = 0.001;
-const float KD = 0.01;
+const float KI = 0.00003;
+const float KD = 0.008;
+const float D_FILTER = 0.3;  // Derivative low-pass filter (0.0-1.0, higher = more smoothing)
 
 const int GOAL = 3500;  // Center position for line sensor
 
@@ -76,13 +77,6 @@ void setup()
 
 void loop()
 {
-    // Prints state every 100ms (10Hz)
-    if ((millis() - lastTime) >= 100)
-    {
-        // printState(state);
-        lastTime = millis();
-    }
-
     switch (state) {
         case State::START:    start();    break;
         case State::RESTART:  restart();  break;
@@ -168,14 +162,21 @@ void path() {
     // Proportional term
     float P = KP * error;
     
-    // Integral term
-    integral += error * dt;
-    integral = constrain(integral, -1000, 1000);
+    // Integral term (only accumulate when error is small to prevent windup)
+    if (abs(error) < 500) {
+        integral += error * dt;
+    } else {
+        integral *= 0.95;  // Decay integral when far from line
+    }
+    integral = constrain(integral, -800, 800);
     float I = KI * integral;
     
-    // Derivative term (rate of change of error)
+    // Derivative term with smoothing (rate of change of error)
     float derivative = (error - lastError) / dt;
-    float D = KD * derivative;
+    // Apply low-pass filter to derivative to reduce noise
+    static float smoothedDerivative = 0;
+    smoothedDerivative = D_FILTER * smoothedDerivative + (1.0 - D_FILTER) * derivative;
+    float D = KD * smoothedDerivative;
     
     // Total PID output
     float motor_speed_delta = P + I + D;
