@@ -1,14 +1,6 @@
 #include "SimpleRSLK.h"
-#include "BNO055_support.h"
-#include <Wire.h>
-
-struct bno055_t myBNO;
-struct bno055_euler myEulerData;
-
-float initialHeading;
 
 unsigned long lastTime = 0;
-String btnMsg = " ";
 
 bool shot = false;
 
@@ -25,11 +17,9 @@ const int TURN_SPEED = 100;
 const int SHOOTER_PIN = P10_4; // Pin to control the shooter mechanism
 
 // PID constants
-const float KP = 0.05;// POGGIES: 0.05, 0.001 up to 0.0012, 0.01
+const float KP = 0.05;
 const float KI = 0.001;
 const float KD = 0.01;
-const double LINE_POSITION_GOAL = 3500.0;
-const unsigned long PID_TELEMETRY_INTERVAL_MS = 50;
 
 const int GOAL = 3500;  // Center position for line sensor
 
@@ -37,15 +27,8 @@ float lastError = 0;
 float integral = 0;
 unsigned long lastPIDTime = 0;
 
-boolean smacked = false;
 bool bumperPreviouslyPressed = false; // Tracks last bumper state to detect new hits
-bool pendingDoneAfterTurn = false;    // Signals that the next turn should end in DONE
-
-void publishPidTelemetry();
-
-
-// Alignment Constants
-   // Timeout while trying to align (ms)
+bool pendingHomeAfterTurn = false;    // Signals that the next turn should go to HOME
 
 enum class State {
     START,
@@ -53,6 +36,7 @@ enum class State {
     PATH,
     SHOOT,
     TURN,
+    HOME,
     DONE
 };
 
@@ -65,15 +49,6 @@ void printState(State s) {
 void setup()
 {
     delay(100);
-
-    // Initialize I2C communication
-    Wire.begin();
-
-    // Initialization of the BNO055
-    BNO_Init(&myBNO); // Assigning the structure to hold information about the device
-
-    // Configuration to NDoF mode
-    bno055_set_operation_mode(OPERATION_MODE_NDOF);
 
     Serial.begin(115200);
 
@@ -96,20 +71,11 @@ void setup()
     enableMotor(BOTH_MOTORS);
     setMotorSpeed(BOTH_MOTORS, 0);
 
-    // Read initial heading
-    delay(500);
-    bno055_read_euler_hrp(&myEulerData); // Update Euler data into the structure
-    initialHeading = float(myEulerData.h) / 16.00;
-    Serial.print("Initial Heading(Yaw): "); // To read out the Heading (Yaw)
-    Serial.println(initialHeading);
-
     enableMotor(BOTH_MOTORS);
 }
 
 void loop()
 {
-    // delay(5); // TODO: See of this can be removed
-
     // Prints state every 100ms (10Hz)
     if ((millis() - lastTime) >= 100)
     {
@@ -119,10 +85,11 @@ void loop()
 
     switch (state) {
         case State::START:    start();    break;
-        case State::RESTART:  restart();    break;
+        case State::RESTART:  restart();  break;
         case State::PATH:     path();     break;
         case State::SHOOT:    shoot();    break;
         case State::TURN:     turn();     break;
+        case State::HOME:     home();     break;
         case State::DONE:     done();     break;
     }
 }
@@ -135,14 +102,12 @@ void start() {
     // Reset everything
     resetLeftEncoderCnt();
     resetRightEncoderCnt();
-    bno055_read_euler_hrp(&myEulerData);
-    initialHeading = float(myEulerData.h) / 16.00;
 
     // Initialize motors
     enableMotor(BOTH_MOTORS);
 
     bumperPreviouslyPressed = isBumperPressed();
-    pendingDoneAfterTurn = false;
+    pendingHomeAfterTurn = false;
 
     state = State::PATH;
 }
@@ -154,14 +119,12 @@ void restart() {
     // Reset everything
     resetLeftEncoderCnt();
     resetRightEncoderCnt();
-    bno055_read_euler_hrp(&myEulerData);
-    initialHeading = float(myEulerData.h) / 16.00;
 
     // Initialize motors
     enableMotor(BOTH_MOTORS);
 
     bumperPreviouslyPressed = isBumperPressed();
-    pendingDoneAfterTurn = false;
+    pendingHomeAfterTurn = false;
 
     state = State::PATH;
 }
@@ -228,22 +191,12 @@ void path() {
     setMotorSpeed(RIGHT_MOTOR, right_motor_speed);
 
     if (newBumperPress) {
-        if (shot) {
-            setMotorSpeed(BOTH_MOTORS, 0);  // Stop motors
-            lastError = 0;
-            integral = 0;
-            lastPIDTime = millis();
-            delay(50);
-            pendingDoneAfterTurn = true;
-            state = State::TURN;
-        } else {
-            setMotorSpeed(BOTH_MOTORS, 0);  // Stop motors
-            lastError = 0;
-            integral = 0;
-            lastPIDTime = millis();
-            delay(400);
-            state = State::SHOOT;
-        }
+        setMotorSpeed(BOTH_MOTORS, 0);  // Stop motors
+        lastError = 0;
+        integral = 0;
+        lastPIDTime = millis();
+        delay(400);
+        state = State::SHOOT;
     }
     
     else if (isButtonPressed()) {
@@ -263,6 +216,7 @@ void shoot() {
     digitalWrite(SHOOTER_PIN, LOW);
     delay(50);
     shot = true;
+    pendingHomeAfterTurn = true;
     state = State::TURN;
 }
 
@@ -272,8 +226,7 @@ void turn() {
     static uint16_t startRightCount = 0;
     
     // Calculate encoder counts needed for 180 degree turn
-    // Adjust the 500 value based on your robot's dimensions
-    const uint16_t COUNTS_FOR_180 = 300; // TODO: Calibrate this value
+    const uint16_t COUNTS_FOR_180 = 180; // Calibrated value for 180 degree turn
     
     if (!turningStarted) {
         // Start the turn
@@ -304,43 +257,59 @@ void turn() {
         resetLeftEncoderCnt();
         resetRightEncoderCnt();
 
-        if (pendingDoneAfterTurn) {
-            pendingDoneAfterTurn = false;
-            state = State::DONE;
+        if (pendingHomeAfterTurn) {
+            pendingHomeAfterTurn = false;
+            state = State::HOME;
         } else {
             state = State::PATH;
         }
     }
 }
 
+void home() {
+    // Drive straight without gyro until bumper is pressed
+    static bool homeStarted = false;
+    
+    if (!homeStarted) {
+        // Initialize for driving straight
+        resetLeftEncoderCnt();
+        resetRightEncoderCnt();
+        setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
+        setMotorSpeed(BOTH_MOTORS, BASE_SPEED);
+        homeStarted = true;
+        bumperPreviouslyPressed = isBumperPressed();
+    }
+    
+    // Check for bumper press
+    bool bumperPressed = isBumperPressed();
+    bool newBumperPress = bumperPressed && !bumperPreviouslyPressed;
+    bumperPreviouslyPressed = bumperPressed;
+    
+    if (newBumperPress) {
+        // Stop motors
+        setMotorSpeed(BOTH_MOTORS, 0);
+        homeStarted = false;
+        delay(50);
+        state = State::DONE;
+    }
+}
+
 void done() {
     setMotorSpeed(BOTH_MOTORS, 0);
-    // disableMotor(BOTH_MOTORS);
-    // Serial.println("DONE - Press button to restart");
-    // delay(1000);
-    if (isButtonPressed() || (isBumperPressed() )) {
+    // Serial.println("DONE - Press bumper to restart");
+    
+    // Wait for bumper press to restart
+    bool bumperPressed = isBumperPressed();
+    bool newBumperPress = bumperPressed && !bumperPreviouslyPressed;
+    bumperPreviouslyPressed = bumperPressed;
+    
+    if (newBumperPress) {
         shot = false;
         state = State::RESTART;
     }
 }
 
 // Helper functions
-float readHeadingDegrees() {
-    bno055_read_euler_hrp(&myEulerData);
-    return float(myEulerData.h) / 16.0f;
-}
-
-float calculateAngleDifference(float target, float current) {
-    float delta = target - current;
-    while (delta > 180.0f) {
-        delta -= 360.0f;
-    }
-    while (delta < -180.0f) {
-        delta += 360.0f;
-    }
-    return delta;
-}
-
 boolean isBumperPressed() {
     return (isBumpSwitchPressed(2) && isBumpSwitchPressed(3)); // TODO: adjust switch numbers as needed
 }
