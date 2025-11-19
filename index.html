@@ -70,7 +70,7 @@
         <!-- 500 Point Zone -->
         <div class="bg-white/80 rounded-2xl border border-amber-200 shadow h-20 overflow-hidden">
             <div class="flex items-stretch h-full">
-                <button onclick="updateScore(-500)" class="btn-tap w-14 flex items-center justify-center text-amber-700 border-r border-amber-200 bg-amber-100/70" aria-label="Subtract 500">
+                <button data-score-btn onclick="updateScore(-500)" class="btn-tap w-14 flex items-center justify-center text-amber-700 border-r border-amber-200 bg-amber-100/70" aria-label="Subtract 500">
                     <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>
                 </button>
                 <div class="flex-grow flex flex-col items-center justify-center gap-0.5 bg-gradient-to-b from-amber-50/80 to-white py-1.5">
@@ -80,7 +80,7 @@
                         <span id="count-500" class="text-xl font-mono tracking-tight text-amber-800">x0</span>
                     </div>
                 </div>
-                <button onclick="updateScore(500)" class="btn-tap w-16 flex items-center justify-center text-amber-950 bg-amber-400 font-semibold" aria-label="Add 500">
+                <button data-score-btn onclick="updateScore(500)" class="btn-tap w-16 flex items-center justify-center text-amber-950 bg-amber-400 font-semibold" aria-label="Add 500">
                     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
                 </button>
             </div>
@@ -89,7 +89,7 @@
         <!-- 300 Point Zone -->
         <div class="bg-white/80 rounded-2xl border border-teal-200 shadow h-20 overflow-hidden">
             <div class="flex items-stretch h-full">
-                <button onclick="updateScore(-300)" class="btn-tap w-14 flex items-center justify-center text-teal-700 border-r border-teal-200 bg-teal-100/70" aria-label="Subtract 300">
+                <button data-score-btn onclick="updateScore(-300)" class="btn-tap w-14 flex items-center justify-center text-teal-700 border-r border-teal-200 bg-teal-100/70" aria-label="Subtract 300">
                     <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>
                 </button>
                 <div class="flex-grow flex flex-col items-center justify-center gap-0.5 bg-gradient-to-b from-teal-50/80 to-white py-1.5">
@@ -99,7 +99,7 @@
                         <span id="count-300" class="text-xl font-mono tracking-tight text-teal-800">x0</span>
                     </div>
                 </div>
-                <button onclick="updateScore(300)" class="btn-tap w-16 flex items-center justify-center text-teal-950 bg-teal-300 font-semibold" aria-label="Add 300">
+                <button data-score-btn onclick="updateScore(300)" class="btn-tap w-16 flex items-center justify-center text-teal-950 bg-teal-300 font-semibold" aria-label="Add 300">
                     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
                 </button>
             </div>
@@ -108,7 +108,7 @@
         <!-- 100 Point Zone -->
         <div class="bg-white/80 rounded-2xl border border-sky-200 shadow h-20 overflow-hidden">
             <div class="flex items-stretch h-full">
-                <button onclick="updateScore(-100)" class="btn-tap w-14 flex items-center justify-center text-sky-700 border-r border-sky-200 bg-sky-100/70" aria-label="Subtract 100">
+                <button data-score-btn onclick="updateScore(-100)" class="btn-tap w-14 flex items-center justify-center text-sky-700 border-r border-sky-200 bg-sky-100/70" aria-label="Subtract 100">
                     <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>
                 </button>
                 <div class="flex-grow flex flex-col items-center justify-center gap-0.5 bg-gradient-to-b from-sky-50/80 to-white py-1.5">
@@ -118,7 +118,7 @@
                         <span id="count-100" class="text-xl font-mono tracking-tight text-sky-800">x0</span>
                     </div>
                 </div>
-                <button onclick="updateScore(100)" class="btn-tap w-16 flex items-center justify-center text-sky-950 bg-sky-300 font-semibold" aria-label="Add 100">
+                <button data-score-btn onclick="updateScore(100)" class="btn-tap w-16 flex items-center justify-center text-sky-950 bg-sky-300 font-semibold" aria-label="Add 100">
                     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
                 </button>
             </div>
@@ -127,7 +127,7 @@
         <!-- 50 Point Zone -->
         <div class="bg-white/80 rounded-2xl border border-emerald-200 shadow h-20 overflow-hidden">
             <div class="flex items-stretch h-full">
-                <button onclick="updateScore(-50)" class="btn-tap w-14 flex items-center justify-center text-emerald-700 border-r border-emerald-200 bg-emerald-100/70" aria-label="Subtract 50">
+                <button data-score-btn onclick="updateScore(-50)" class="btn-tap w-14 flex items-center justify-center text-emerald-700 border-r border-emerald-200 bg-emerald-100/70" aria-label="Subtract 50">
                     <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>
                 </button>
                 <div class="flex-grow flex flex-col items-center justify-center gap-0.5 bg-gradient-to-b from-emerald-50/80 to-white py-1.5">
@@ -137,7 +137,7 @@
                         <span id="count-50" class="text-xl font-mono tracking-tight text-emerald-800">x0</span>
                     </div>
                 </div>
-                <button onclick="updateScore(50)" class="btn-tap w-16 flex items-center justify-center text-emerald-950 bg-emerald-300 font-semibold" aria-label="Add 50">
+                <button data-score-btn onclick="updateScore(50)" class="btn-tap w-16 flex items-center justify-center text-emerald-950 bg-emerald-300 font-semibold" aria-label="Add 50">
                     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
                 </button>
             </div>
@@ -288,17 +288,20 @@
             100: document.getElementById('stats-points-bar-100'),
             50: document.getElementById('stats-points-bar-50')
         };
+        const scoreButtons = Array.from(document.querySelectorAll('[data-score-btn]'));
 
         let timerStartSeconds = normalizeTimerValue(timerStartInput ? parseInt(timerStartInput.value, 10) : 600);
         let timerRemainingMs = timerStartSeconds * 1000;
         let timerInterval = null;
         let timerTargetEndTs = null;
         let sessionStartTimestamp = null;
+        let scoringLocked = false;
 
         if (timerStartInput) {
             timerStartInput.value = timerStartSeconds;
-    }
-    updateStats();
+        }
+        setScoringLocked(false);
+        updateStats();
         updateTimerDisplay();
 
         // Initialize from localStorage if available
@@ -309,7 +312,22 @@
             updateDisplay();
         }
 
+        function setScoringLocked(locked) {
+            scoringLocked = !!locked;
+            scoreButtons.forEach(btn => {
+                btn.disabled = scoringLocked;
+                btn.classList.toggle('opacity-50', scoringLocked);
+                btn.classList.toggle('cursor-not-allowed', scoringLocked);
+            });
+        }
+
         function updateScore(amount) {
+            if (scoringLocked) {
+                if (timerHint) {
+                    timerHint.innerText = 'Time up — restart timer to keep scoring';
+                }
+                return;
+            }
             currentScore += amount;
             
             // Update individual counts
@@ -329,6 +347,7 @@
             if(confirm("Are you sure you want to reset the score to 0?")) {
                 currentScore = 0;
                 counts = { 500: 0, 300: 0, 100: 0, 50: 0 };
+                setScoringLocked(false);
                 saveAndUpdate();
             }
         }
@@ -462,6 +481,7 @@
             if (timerInterval || timerRemainingMs <= 0) return;
             const now = performance.now();
             timerTargetEndTs = now + timerRemainingMs;
+            setScoringLocked(false);
             setTimerState('running');
             timerHint.innerText = 'Timer running';
             timerInterval = requestAnimationFrame(tickTimer);
@@ -473,7 +493,7 @@
             timerRemainingMs = Math.max(0, timerTargetEndTs - now);
             updateTimerDisplay();
             if (timerRemainingMs <= 0) {
-                stopTimer();
+                finishTimer();
             } else if (timerInterval) {
                 timerInterval = requestAnimationFrame(tickTimer);
             }
@@ -487,6 +507,21 @@
             timerHint.innerText = 'Paused — press Start to resume';
         }
 
+        function finishTimer() {
+            if (timerInterval) {
+                cancelAnimationFrame(timerInterval);
+                timerInterval = null;
+            }
+            timerTargetEndTs = null;
+            timerRemainingMs = 0;
+            updateTimerDisplay();
+            setTimerState('setup');
+            if (timerHint) {
+                timerHint.innerText = 'Time up — scoring locked';
+            }
+            setScoringLocked(true);
+        }
+
         function stopTimer() {
             if (timerInterval) {
                 cancelAnimationFrame(timerInterval);
@@ -496,6 +531,7 @@
             timerRemainingMs = timerStartSeconds * 1000;
             updateTimerDisplay();
             setTimerState('setup');
+            setScoringLocked(false);
         }
     </script>
 </body>
