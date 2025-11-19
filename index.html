@@ -240,8 +240,10 @@
     </footer>
 
     <script>
-        const SCORING_ZONES = [500, 300, 100];
-        const BONUS_ZONE = 50;
+    const SCORING_ZONES = [500, 300, 100];
+    const BONUS_ZONE = 50;
+    const MIN_RATE_SAMPLE_MS = 2000;
+    const MIN_RATE_SAMPLE_HITS = 2;
 
         let currentScore = 0;
         let counts = {
@@ -377,14 +379,24 @@
                 sessionStartTimestamp = null;
             } else {
                 const now = Date.now();
-                const elapsedMs = Math.max(1, sessionStartTimestamp ? now - sessionStartTimestamp : 1);
-                const elapsedMinutes = elapsedMs / 60000;
-                const ducksPerMinute = scorableHits / elapsedMinutes;
-                const elapsedSeconds = elapsedMs / 1000;
-                const secondsPerDuck = elapsedSeconds / scorableHits;
+                const elapsedMs = Math.max(0, sessionStartTimestamp ? now - sessionStartTimestamp : 0);
+                const enoughHits = scorableHits >= MIN_RATE_SAMPLE_HITS;
+                const enoughTime = elapsedMs >= MIN_RATE_SAMPLE_MS;
+                const canShowRates = enoughHits || enoughTime;
+
                 statsTotal.innerText = scorableHits.toLocaleString();
-                statsDucksPerMinute.innerText = ducksPerMinute.toFixed(1);
-                statsSecondsPerDuck.innerText = secondsPerDuck.toFixed(1);
+
+                if (canShowRates && elapsedMs > 0) {
+                    const elapsedMinutes = elapsedMs / 60000;
+                    const ducksPerMinute = scorableHits / elapsedMinutes;
+                    const elapsedSeconds = elapsedMs / 1000;
+                    const secondsPerDuck = elapsedSeconds / scorableHits;
+                    statsDucksPerMinute.innerText = ducksPerMinute.toFixed(1);
+                    statsSecondsPerDuck.innerText = secondsPerDuck.toFixed(1);
+                } else {
+                    statsDucksPerMinute.innerText = '—';
+                    statsSecondsPerDuck.innerText = '—';
+                }
             }
 
             Object.keys(positiveCounts).forEach(zone => {
