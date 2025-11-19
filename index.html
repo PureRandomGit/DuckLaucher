@@ -286,7 +286,7 @@
             50: document.getElementById('stats-points-bar-50')
         };
 
-        let timerStartSeconds = normalizeTimerValue(timerStartInput ? parseInt(timerStartInput.value, 10) : 120);
+        let timerStartSeconds = normalizeTimerValue(timerStartInput ? parseInt(timerStartInput.value, 10) : 600);
         let timerRemainingMs = timerStartSeconds * 1000;
         let timerInterval = null;
         let timerTargetEndTs = null;
