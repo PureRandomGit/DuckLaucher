@@ -296,6 +296,8 @@
         let timerTargetEndTs = null;
         let sessionStartTimestamp = null;
         let scoringLocked = false;
+        let lockoutTimeout = null;
+        let blinkInterval = null;
 
         if (timerStartInput) {
             timerStartInput.value = timerStartSeconds;
@@ -324,7 +326,7 @@
         function updateScore(amount) {
             if (scoringLocked) {
                 if (timerHint) {
-                    timerHint.innerText = 'Time up — restart timer to keep scoring';
+                    timerHint.innerText = 'Scoring locked — please wait...';
                 }
                 return;
             }
@@ -492,6 +494,7 @@
             const now = performance.now();
             timerRemainingMs = Math.max(0, timerTargetEndTs - now);
             updateTimerDisplay();
+            updateStats(); // Update stats every frame while timer runs
             if (timerRemainingMs <= 0) {
                 finishTimer();
             } else if (timerInterval) {
@@ -516,10 +519,37 @@
             timerRemainingMs = 0;
             updateTimerDisplay();
             setTimerState('setup');
+            
+            // Lock scoring temporarily for 5 seconds
             if (timerHint) {
-                timerHint.innerText = 'Time up — scoring locked';
+                timerHint.innerText = 'Time up — unlocking in 5s...';
             }
             setScoringLocked(true);
+            
+            // Start blinking the timer display
+            let blinkCount = 0;
+            blinkInterval = setInterval(() => {
+                if (timerDisplay) {
+                    timerDisplay.style.opacity = blinkCount % 2 === 0 ? '0.3' : '1';
+                    blinkCount++;
+                }
+            }, 250);
+            
+            // Unlock after 5 seconds
+            lockoutTimeout = setTimeout(() => {
+                setScoringLocked(false);
+                if (timerHint) {
+                    timerHint.innerText = 'Time up — scoring unlocked for corrections';
+                }
+                // Stop blinking
+                if (blinkInterval) {
+                    clearInterval(blinkInterval);
+                    blinkInterval = null;
+                }
+                if (timerDisplay) {
+                    timerDisplay.style.opacity = '1';
+                }
+            }, 5000);
         }
 
         function stopTimer() {
@@ -532,6 +562,19 @@
             updateTimerDisplay();
             setTimerState('setup');
             setScoringLocked(false);
+            
+            // Clear any pending lockout
+            if (lockoutTimeout) {
+                clearTimeout(lockoutTimeout);
+                lockoutTimeout = null;
+            }
+            if (blinkInterval) {
+                clearInterval(blinkInterval);
+                blinkInterval = null;
+            }
+            if (timerDisplay) {
+                timerDisplay.style.opacity = '1';
+            }
         }
     </script>
 </body>
