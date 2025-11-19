@@ -13,24 +13,25 @@ uint16_t sensorMinVal[LS_NUM_SENSORS] = {828, 730, 655, 633, 582, 715, 520, 742}
 // Robot Constants
 const int MAX_SPEED = 100;
 const int BASE_SPEED = 90;
+const int SLOW_SPEED = 40;
 const int TURN_SPEED = 100;
-const int SHOOTER_PIN = P10_4; // Pin to control the shooter mechanism
+const int SHOOTER_PIN = P10_4; 
+const unsigned long NORMAL_SPEED_TIME_MS = 2500; // Time to run at normal speed before slowing down (milliseconds) 
 
 // PID constants
-const float KP = 0.05;// POGGIES: 0.05, 0.001 up to 0.0012, 0.01
-const float KI = 0.001;
-const float KD = 0.01;
-const double LINE_POSITION_GOAL = 3500.0;
-const unsigned long PID_TELEMETRY_INTERVAL_MS = 50;
+const float KP = 0.05f;
+const float KI = 0.0012f;
+const float KD = 0.01f;
+const float INTEGRAL_LIMIT = 10000.0f; // Windup protection
+const float GOAL = 3500.0f;  // Center position for line sensor
 
-const int GOAL = 3500;  // Center position for line sensor
-
-float lastError = 0;
-float integral = 0;
+float lastError = 0.0f;
+float integral = 0.0f;
 unsigned long lastPIDTime = 0;
 
 bool bumperPreviouslyPressed = false; // Tracks last bumper state to detect new hits
 bool pendingDoneAfterTurn = false;    // Signals that the next turn should end in DONE
+unsigned long pathStartTime = 0; // When path following started
 
 enum class State {
     START,
@@ -68,6 +69,9 @@ void setup()
     enableMotor(BOTH_MOTORS);
     setMotorSpeed(BOTH_MOTORS, 0);
 
+    // Initialize PID timer
+    lastPIDTime = millis();
+    
     enableMotor(BOTH_MOTORS);
 }
 
@@ -94,14 +98,20 @@ void start() {
     // Initialize motors
     enableMotor(BOTH_MOTORS);
 
+    // Reset PID variables on start
+    lastError = 0;
+    integral = 0;
+    lastPIDTime = millis();
+
     bumperPreviouslyPressed = isBumperPressed();
     pendingDoneAfterTurn = false;
+    pathStartTime = millis(); // Record when path following starts
 
     state = State::PATH;
 }
 
 void restart() {
-    delay(100); // Debounce/Settle delay
+    delay(50); // Debounce/Settle delay
 
     // Reset everything
     resetLeftEncoderCnt();
@@ -110,8 +120,14 @@ void restart() {
     // Initialize motors
     enableMotor(BOTH_MOTORS);
 
+    // Reset PID variables on restart
+    lastError = 0;
+    integral = 0;
+    lastPIDTime = millis();
+
     bumperPreviouslyPressed = isBumperPressed();
     pendingDoneAfterTurn = false;
+    pathStartTime = millis(); // Record when path following starts
 
     state = State::PATH;
 }
@@ -145,53 +161,65 @@ void path() {
 
     // Calculate time delta for proper PID
     unsigned long currentTime = millis();
-    float dt = (currentTime - lastPIDTime) / 1000.0;  // Convert to seconds
-    if (dt <= 0) { dt = 0.001; }
+    float dt = (currentTime - lastPIDTime) / 1000.0f;
+    if (dt <= 0) { dt = 0.001f; }
     lastPIDTime = currentTime;
 
     // PID calculation
-    int error = linePos - GOAL;
+    float error = float(linePos) - GOAL;
     
     // Proportional term
     float P = KP * error;
     
-    // Integral term
+    // Integral term with hard clamp (windup protection)
     integral += error * dt;
-    integral = constrain(integral, -1000, 1000);
+    if (integral > INTEGRAL_LIMIT) integral = INTEGRAL_LIMIT;
+    if (integral < -INTEGRAL_LIMIT) integral = -INTEGRAL_LIMIT;
     float I = KI * integral;
     
-    // Derivative term (rate of change of error)
-    float derivative = (error - lastError) / dt;
-    float D = KD * derivative;
+    // Derivative term
+    float D = KD * ((error - lastError) / dt);
+    lastError = error;
     
     // Total PID output
-    float motor_speed_delta = P + I + D;
+    float delta = P + I + D;
     
-    // Update last error for next iteration
-    lastError = error;
+    // Ensure motors are forward before applying speed
+    setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
+
+    // Determine current speed based on time elapsed and whether we've shot yet
+    int currentBaseSpeed = BASE_SPEED;
+    
+    if (!shot) {
+        // Going to shoot for the first time
+        unsigned long pathElapsed = millis() - pathStartTime;
+        if (pathElapsed >= NORMAL_SPEED_TIME_MS) {
+            // After normal speed time, slow down until bumper is hit
+            currentBaseSpeed = SLOW_SPEED;
+        }
+    }
+    // After shooting (shot == true), always use normal BASE_SPEED on the way back
 
     // Apply PID correction to base speed
-    int left_motor_speed = constrain(BASE_SPEED + motor_speed_delta, 0, MAX_SPEED);
-    int right_motor_speed = constrain(BASE_SPEED - motor_speed_delta, 0, MAX_SPEED);
+    int left_motor_speed = constrain(int(currentBaseSpeed + delta), 0, MAX_SPEED);
+    int right_motor_speed = constrain(int(currentBaseSpeed - delta), 0, MAX_SPEED);
 
     setMotorSpeed(LEFT_MOTOR, left_motor_speed);
     setMotorSpeed(RIGHT_MOTOR, right_motor_speed);
 
     if (newBumperPress) {
+        setMotorSpeed(BOTH_MOTORS, 0);
+        lastError = 0;
+        integral = 0;
+        
         if (shot) {
-            setMotorSpeed(BOTH_MOTORS, 0);  // Stop motors
-            lastError = 0;
-            integral = 0;
-            lastPIDTime = millis();
+            // Second bumper hit - turn around
             delay(50);
             pendingDoneAfterTurn = true;
             state = State::TURN;
         } else {
-            setMotorSpeed(BOTH_MOTORS, 0);  // Stop motors
-            lastError = 0;
-            integral = 0;
-            lastPIDTime = millis();
-            delay(400);
+            // First bumper hit - shoot
+            delay(300);
             state = State::SHOOT;
         }
     }
@@ -206,12 +234,17 @@ void path() {
 }
 
 void shoot() {
-    delay(100);
     digitalWrite(SHOOTER_PIN, HIGH);
     delay(300);
     digitalWrite(SHOOTER_PIN, LOW);
-    delay(50);
+    delay(10);
     shot = true;
+    
+    // Reset PID before next move
+    lastError = 0;
+    integral = 0;
+    lastPIDTime = millis();
+    
     state = State::TURN;
 }
 
@@ -251,10 +284,17 @@ void turn() {
         resetLeftEncoderCnt();
         resetRightEncoderCnt();
 
+        // Reset PID time so we don't have a huge dt step on resume
+        lastPIDTime = millis();
+        lastError = 0;
+        integral = 0;
+
         if (pendingDoneAfterTurn) {
             pendingDoneAfterTurn = false;
             state = State::DONE;
         } else {
+            // Reset path start time for return journey at normal speed
+            pathStartTime = millis();
             state = State::PATH;
         }
     }
