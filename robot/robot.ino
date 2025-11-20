@@ -16,7 +16,7 @@ const int BASE_SPEED = 90;
 const int SLOW_SPEED = 40;
 const int TURN_SPEED = 100;
 const int SHOOTER_PIN = P10_4; 
-const unsigned long NORMAL_SPEED_TIME_MS = 2500; // Time to run at normal speed before slowing down (milliseconds) 
+const unsigned long NORMAL_SPEED_TIME_MS = 2400; // Time to run at normal speed before slowing down (milliseconds) 
 
 // PID constants
 const float KP = 0.05f;
