@@ -16,12 +16,18 @@ const int BASE_SPEED = 90;
 const int SLOW_SPEED = 40;
 const int TURN_SPEED = 100;
 const int SHOOTER_PIN = P10_4; 
-const uint16_t SLOWDOWN_ENCODER_TICKS = 2000; // 2600
+const uint16_t SLOWDOWN_ENCODER_TICKS = 2650; // 2600
 
-// PID constants
+// PID constants - Normal speed
 const float KP = 0.05f;
 const float KI = 0.0012f;
 const float KD = 0.01f;
+
+// PID constants - Slow speed (TODO: Tune these for slow speed behavior)
+const float KP_SLOW = 0.01f;
+const float KI_SLOW = 0.0001f;
+const float KD_SLOW = 0.005f;
+
 const float INTEGRAL_LIMIT = 10000.0f; // Windup protection
 const float GOAL = 3500.0f;  // Center position for line sensor
 
@@ -168,30 +174,9 @@ void path() {
     if (dt <= 0) { dt = 0.001f; }
     lastPIDTime = currentTime;
 
-    // PID calculation
-    float error = float(linePos) - GOAL;
-    
-    // Proportional term
-    float P = KP * error;
-    
-    // Integral term with hard clamp (windup protection)
-    integral += error * dt;
-    if (integral > INTEGRAL_LIMIT) integral = INTEGRAL_LIMIT;
-    if (integral < -INTEGRAL_LIMIT) integral = -INTEGRAL_LIMIT;
-    float I = KI * integral;
-    
-    // Derivative term
-    float D = KD * ((error - lastError) / dt);
-    lastError = error;
-    
-    // Total PID output
-    float delta = P + I + D;
-    
-    // Ensure motors are forward before applying speed
-    setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
-
     // Determine current speed based on encoder counts and whether we've shot yet
     int currentBaseSpeed = BASE_SPEED;
+    bool usingSlowSpeed = false;
     
     if (!shot) {
         // Going to shoot for the first time
@@ -203,9 +188,37 @@ void path() {
         if (avgTraveled >= SLOWDOWN_ENCODER_TICKS) {
             // After threshold encoder ticks, slow down until bumper is hit
             currentBaseSpeed = SLOW_SPEED;
+            usingSlowSpeed = true;
         }
     }
     // After shooting (shot == true), always use normal BASE_SPEED on the way back
+
+    // PID calculation with appropriate constants based on speed
+    float error = float(linePos) - GOAL;
+    
+    // Select PID constants based on current speed mode
+    float kp = usingSlowSpeed ? KP_SLOW : KP;
+    float ki = usingSlowSpeed ? KI_SLOW : KI;
+    float kd = usingSlowSpeed ? KD_SLOW : KD;
+    
+    // Proportional term
+    float P = kp * error;
+    
+    // Integral term with hard clamp (windup protection)
+    integral += error * dt;
+    if (integral > INTEGRAL_LIMIT) integral = INTEGRAL_LIMIT;
+    if (integral < -INTEGRAL_LIMIT) integral = -INTEGRAL_LIMIT;
+    float I = ki * integral;
+    
+    // Derivative term
+    float D = kd * ((error - lastError) / dt);
+    lastError = error;
+    
+    // Total PID output
+    float delta = P + I + D;
+    
+    // Ensure motors are forward before applying speed
+    setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
 
     // Apply PID correction to base speed
     int left_motor_speed = constrain(int(currentBaseSpeed + delta), 0, MAX_SPEED);
