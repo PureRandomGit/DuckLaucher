@@ -545,7 +545,7 @@
             
             // Lock scoring temporarily for 5 seconds
             if (timerHint) {
-                timerHint.innerText = 'Time up — unlocking in 5s...';
+                timerHint.innerText = 'Times up';
             }
             setScoringLocked(true);
             
@@ -562,7 +562,7 @@
             lockoutTimeout = setTimeout(() => {
                 setScoringLocked(false);
                 if (timerHint) {
-                    timerHint.innerText = 'Time up — scoring unlocked for corrections';
+                    timerHint.innerText = 'Times up — scoring unlocked';
                 }
                 // Stop blinking
                 if (blinkInterval) {
