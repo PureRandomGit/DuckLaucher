@@ -8,7 +8,7 @@ bool shot = false;
 uint16_t sensorVal[LS_NUM_SENSORS];
 uint16_t sensorCalVal[LS_NUM_SENSORS];
 uint16_t sensorMaxVal[LS_NUM_SENSORS] = {2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500};
-uint16_t sensorMinVal[LS_NUM_SENSORS] = {828, 730, 655, 633, 582, 715, 520, 742};
+uint16_t sensorMinVal[LS_NUM_SENSORS] = {537, 628, 491, 536, 500, 551, 459, 624};
 
 // Robot Constants
 const int MAX_SPEED = 100;
@@ -16,7 +16,7 @@ const int BASE_SPEED = 90;
 const int SLOW_SPEED = 40;
 const int TURN_SPEED = 100;
 const int SHOOTER_PIN = P10_4; 
-const unsigned long NORMAL_SPEED_TIME_MS = 2400; // Time to run at normal speed before slowing down (milliseconds) 
+const uint16_t SLOWDOWN_ENCODER_TICKS = 2000; // 2600
 
 // PID constants
 const float KP = 0.05f;
@@ -31,7 +31,8 @@ unsigned long lastPIDTime = 0;
 
 bool bumperPreviouslyPressed = false; // Tracks last bumper state to detect new hits
 bool pendingDoneAfterTurn = false;    // Signals that the next turn should end in DONE
-unsigned long pathStartTime = 0; // When path following started
+uint16_t pathStartEncoderLeft = 0;    // Encoder count when path following started
+uint16_t pathStartEncoderRight = 0;   // Encoder count when path following started
 
 enum class State {
     START,
@@ -105,7 +106,8 @@ void start() {
 
     bumperPreviouslyPressed = isBumperPressed();
     pendingDoneAfterTurn = false;
-    pathStartTime = millis(); // Record when path following starts
+    pathStartEncoderLeft = getEncoderLeftCnt();   // Record encoder count when path starts
+    pathStartEncoderRight = getEncoderRightCnt(); // Record encoder count when path starts
 
     state = State::PATH;
 }
@@ -127,7 +129,8 @@ void restart() {
 
     bumperPreviouslyPressed = isBumperPressed();
     pendingDoneAfterTurn = false;
-    pathStartTime = millis(); // Record when path following starts
+    pathStartEncoderLeft = getEncoderLeftCnt();   // Record encoder count when path starts
+    pathStartEncoderRight = getEncoderRightCnt(); // Record encoder count when path starts
 
     state = State::PATH;
 }
@@ -187,14 +190,18 @@ void path() {
     // Ensure motors are forward before applying speed
     setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
 
-    // Determine current speed based on time elapsed and whether we've shot yet
+    // Determine current speed based on encoder counts and whether we've shot yet
     int currentBaseSpeed = BASE_SPEED;
     
     if (!shot) {
         // Going to shoot for the first time
-        unsigned long pathElapsed = millis() - pathStartTime;
-        if (pathElapsed >= NORMAL_SPEED_TIME_MS) {
-            // After normal speed time, slow down until bumper is hit
+        // Calculate average encoder ticks traveled since path started
+        uint16_t leftTraveled = getEncoderLeftCnt() - pathStartEncoderLeft;
+        uint16_t rightTraveled = getEncoderRightCnt() - pathStartEncoderRight;
+        uint16_t avgTraveled = (leftTraveled + rightTraveled) / 2;
+        
+        if (avgTraveled >= SLOWDOWN_ENCODER_TICKS) {
+            // After threshold encoder ticks, slow down until bumper is hit
             currentBaseSpeed = SLOW_SPEED;
         }
     }
@@ -293,8 +300,9 @@ void turn() {
             pendingDoneAfterTurn = false;
             state = State::DONE;
         } else {
-            // Reset path start time for return journey at normal speed
-            pathStartTime = millis();
+            // Record encoder counts for return journey at normal speed
+            pathStartEncoderLeft = getEncoderLeftCnt();
+            pathStartEncoderRight = getEncoderRightCnt();
             state = State::PATH;
         }
     }
