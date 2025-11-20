@@ -64,6 +64,10 @@
                     <button onclick="pauseTimer()" class="btn-tap py-2 rounded-xl bg-amber-400/90 text-slate-900">Pause</button>
                     <button onclick="stopTimer()" class="btn-tap py-2 rounded-xl bg-rose-400/90 text-white">Stop</button>
                 </div>
+                <div class="grid grid-cols-2 gap-2 text-xs font-semibold">
+                    <button onclick="adjustTimer(-30)" class="btn-tap py-2 rounded-xl bg-rose-100 text-rose-700 border border-rose-200 hover:bg-rose-200 transition-colors">Penalty -30s</button>
+                    <button onclick="adjustTimer(-5)" class="btn-tap py-2 rounded-xl bg-rose-100 text-rose-700 border border-rose-200 hover:bg-rose-200 transition-colors">Penalty -5s</button>
+                </div>
             </div>
         </section>
         
@@ -467,6 +471,25 @@
             }
         }
         setTimerState('setup');
+
+        function adjustTimer(seconds) {
+            const ms = seconds * 1000;
+            if (timerInterval) {
+                timerTargetEndTs += ms;
+                const now = performance.now();
+                if (timerTargetEndTs <= now) {
+                    timerRemainingMs = 0;
+                    finishTimer();
+                } else {
+                    timerRemainingMs = timerTargetEndTs - now;
+                    updateTimerDisplay();
+                }
+            } else {
+                timerRemainingMs += ms;
+                if (timerRemainingMs < 0) timerRemainingMs = 0;
+                updateTimerDisplay();
+            }
+        }
 
         function startFromSetup() {
             const newValue = normalizeTimerValue(timerStartInput ? parseInt(timerStartInput.value, 10) : 120);
