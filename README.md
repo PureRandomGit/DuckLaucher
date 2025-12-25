@@ -1,6 +1,6 @@
 
 # Duck Launcher
-[Robot](duckLauncherShotSmall.png)
+![Robot](robot.png)
 Code ran on my teams robot for the UCF EGN1006C Final project in which we placed first in the entire spring semester of 2025, scoring 30,500 points with 81 ducks.
 
 This is a full revamp of the example code and includes a full PID instead of just a P value.
