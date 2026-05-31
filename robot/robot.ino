@@ -1,60 +1,44 @@
 #include "SimpleRSLK.h"
-#include "BNO055_support.h"
-#include <Wire.h>
-
-struct bno055_t myBNO;
-struct bno055_euler myEulerData;
-
-float initialHeading;
 
 unsigned long lastTime = 0;
-String btnMsg = " ";
 
 bool shot = false;
-
-bool hasShooter = true;
-
-bool slowDown = false; // Set to true to slow down on wall approach
-bool returning = false;
-float timeToWall = 2.0;
-
-unsigned long pathStateStartTime = 0; // Timestamp for PATH state entry
 
 // Light sensor calibration values
 uint16_t sensorVal[LS_NUM_SENSORS];
 uint16_t sensorCalVal[LS_NUM_SENSORS];
 uint16_t sensorMaxVal[LS_NUM_SENSORS] = {2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500};
-uint16_t sensorMinVal[LS_NUM_SENSORS] = {828, 730, 655, 633, 582, 715, 520, 742};
+uint16_t sensorMinVal[LS_NUM_SENSORS] = {537, 628, 491, 536, 500, 551, 459, 624};
 
 // Robot Constants
 const int MAX_SPEED = 100;
 const int BASE_SPEED = 90;
+const int SLOW_SPEED = 40;
 const int TURN_SPEED = 100;
-const int SLOW_SPEED = 60; // Reduced speed when approaching the wall
-const int SHOOTER_PIN = P10_4; // Pin to control the shooter mechanism
+const int SHOOTER_PIN = P10_4; 
+const uint16_t SLOWDOWN_ENCODER_TICKS = 2650; // 2600
 
-// PID constants
-const float KP = 0.05;// POGGIES: 0.05, 0.001 up to 0.0012, 0.01
-const float KI = 0.001;
-const float KD = 0.01;
-const double LINE_POSITION_GOAL = 3500.0;
-const unsigned long PID_TELEMETRY_INTERVAL_MS = 50;
+// PID constants - Normal speed
+const float KP = 0.05f;
+const float KI = 0.0012f;
+const float KD = 0.01f;
 
-const int GOAL = 3500;  // Center position for line sensor
+// PID constants - Slow speed (TODO: Tune these for slow speed behavior)
+const float KP_SLOW = 0.01f;
+const float KI_SLOW = 0.0001f;
+const float KD_SLOW = 0.005f;
 
-float lastError = 0;
-float integral = 0;
+const float INTEGRAL_LIMIT = 10000.0f; // Windup protection
+const float GOAL = 3500.0f;  // Center position for line sensor
+
+float lastError = 0.0f;
+float integral = 0.0f;
 unsigned long lastPIDTime = 0;
 
-boolean smacked = false;
 bool bumperPreviouslyPressed = false; // Tracks last bumper state to detect new hits
 bool pendingDoneAfterTurn = false;    // Signals that the next turn should end in DONE
-
-void publishPidTelemetry();
-
-
-// Alignment Constants
-   // Timeout while trying to align (ms)
+uint16_t pathStartEncoderLeft = 0;    // Encoder count when path following started
+uint16_t pathStartEncoderRight = 0;   // Encoder count when path following started
 
 enum class State {
     START,
@@ -67,22 +51,9 @@ enum class State {
 
 State state = State::START;
 
-void printState(State s) {
-    Serial.println(static_cast<int>(s));
-}
-
 void setup()
 {
     delay(100);
-
-    // Initialize I2C communication
-    Wire.begin();
-
-    // Initialization of the BNO055
-    BNO_Init(&myBNO); // Assigning the structure to hold information about the device
-
-    // Configuration to NDoF mode
-    bno055_set_operation_mode(OPERATION_MODE_NDOF);
 
     Serial.begin(115200);
 
@@ -105,25 +76,14 @@ void setup()
     enableMotor(BOTH_MOTORS);
     setMotorSpeed(BOTH_MOTORS, 0);
 
-    // Read initial heading
-    delay(500);
-    bno055_read_euler_hrp(&myEulerData); // Update Euler data into the structure
-    initialHeading = float(myEulerData.h) / 16.00;
-    Serial.print("Initial Heading(Yaw): "); // To read out the Heading (Yaw)
-    Serial.println(initialHeading);
-
+    // Initialize PID timer
+    lastPIDTime = millis();
+    
     enableMotor(BOTH_MOTORS);
 }
 
 void loop()
 {
-    // Prints state every 100ms (10Hz)
-    if ((millis() - lastTime) >= 100)
-    {
-        // printState(state);
-        lastTime = millis();
-    }
-
     switch (state) {
         case State::START:    start();    break;
         case State::RESTART:  restart();    break;
@@ -135,46 +95,49 @@ void loop()
 }
 
 void start() {
-    // Serial.println("Start");
     waitBtnPressed(LP_LEFT_BTN, "\nPush left button on Launchpad to start challenge.\n", RED_LED);
     delay(100); // Debounce/Settle delay
 
     // Reset everything
     resetLeftEncoderCnt();
     resetRightEncoderCnt();
-    bno055_read_euler_hrp(&myEulerData);
-    initialHeading = float(myEulerData.h) / 16.00;
 
     // Initialize motors
     enableMotor(BOTH_MOTORS);
 
+    // Reset PID variables on start
+    lastError = 0;
+    integral = 0;
+    lastPIDTime = millis();
+
     bumperPreviouslyPressed = isBumperPressed();
     pendingDoneAfterTurn = false;
+    pathStartEncoderLeft = getEncoderLeftCnt();   // Record encoder count when path starts
+    pathStartEncoderRight = getEncoderRightCnt(); // Record encoder count when path starts
 
-    pathStateStartTime = millis();
-    lastPIDTime = pathStateStartTime;
     state = State::PATH;
 }
 
 void restart() {
-    // Serial.println("restart");
-    delay(100); // Debounce/Settle delay
+    delay(50); // Debounce/Settle delay
 
     // Reset everything
     resetLeftEncoderCnt();
     resetRightEncoderCnt();
-    bno055_read_euler_hrp(&myEulerData);
-    initialHeading = float(myEulerData.h) / 16.00;
 
     // Initialize motors
     enableMotor(BOTH_MOTORS);
 
+    // Reset PID variables on restart
+    lastError = 0;
+    integral = 0;
+    lastPIDTime = millis();
+
     bumperPreviouslyPressed = isBumperPressed();
     pendingDoneAfterTurn = false;
+    pathStartEncoderLeft = getEncoderLeftCnt();   // Record encoder count when path starts
+    pathStartEncoderRight = getEncoderRightCnt(); // Record encoder count when path starts
 
-    pathStateStartTime = millis();
-    lastPIDTime = pathStateStartTime;
-    returning = false;
     state = State::PATH;
 }
 
@@ -207,63 +170,76 @@ void path() {
 
     // Calculate time delta for proper PID
     unsigned long currentTime = millis();
-    float dt = (currentTime - lastPIDTime) / 1000.0;  // Convert to seconds
-    if (dt <= 0) { dt = 0.001; }
+    float dt = (currentTime - lastPIDTime) / 1000.0f;
+    if (dt <= 0) { dt = 0.001f; }
     lastPIDTime = currentTime;
 
-    int baseSpeed = BASE_SPEED;
-    if (slowDown && !returning) {
-        unsigned long slowDownDelayMs = timeToWall > 0.0f
-            ? static_cast<unsigned long>(timeToWall * 1000.0f)
-            : 0UL;
-        if ((currentTime - pathStateStartTime) >= slowDownDelayMs) {
-            baseSpeed = SLOW_SPEED;
+    // Determine current speed based on encoder counts and whether we've shot yet
+    int currentBaseSpeed = BASE_SPEED;
+    bool usingSlowSpeed = false;
+    
+    if (!shot) {
+        // Going to shoot for the first time
+        // Calculate average encoder ticks traveled since path started
+        uint16_t leftTraveled = getEncoderLeftCnt() - pathStartEncoderLeft;
+        uint16_t rightTraveled = getEncoderRightCnt() - pathStartEncoderRight;
+        uint16_t avgTraveled = (leftTraveled + rightTraveled) / 2;
+        
+        if (avgTraveled >= SLOWDOWN_ENCODER_TICKS) {
+            // After threshold encoder ticks, slow down until bumper is hit
+            currentBaseSpeed = SLOW_SPEED;
+            usingSlowSpeed = true;
         }
     }
+    // After shooting (shot == true), always use normal BASE_SPEED on the way back
 
-    // PID calculation
-    int error = linePos - GOAL;
+    // PID calculation with appropriate constants based on speed
+    float error = float(linePos) - GOAL;
+    
+    // Select PID constants based on current speed mode
+    float kp = usingSlowSpeed ? KP_SLOW : KP;
+    float ki = usingSlowSpeed ? KI_SLOW : KI;
+    float kd = usingSlowSpeed ? KD_SLOW : KD;
     
     // Proportional term
-    float P = KP * error;
+    float P = kp * error;
     
-    // Integral term
+    // Integral term with hard clamp (windup protection)
     integral += error * dt;
-    integral = constrain(integral, -1000, 1000);
-    float I = KI * integral;
+    if (integral > INTEGRAL_LIMIT) integral = INTEGRAL_LIMIT;
+    if (integral < -INTEGRAL_LIMIT) integral = -INTEGRAL_LIMIT;
+    float I = ki * integral;
     
-    // Derivative term (rate of change of error)
-    float derivative = (error - lastError) / dt;
-    float D = KD * derivative;
+    // Derivative term
+    float D = kd * ((error - lastError) / dt);
+    lastError = error;
     
     // Total PID output
-    float motor_speed_delta = P + I + D;
+    float delta = P + I + D;
     
-    // Update last error for next iteration
-    lastError = error;
+    // Ensure motors are forward before applying speed
+    setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
 
     // Apply PID correction to base speed
-    int left_motor_speed = constrain(int(baseSpeed + motor_speed_delta), 0, MAX_SPEED);
-    int right_motor_speed = constrain(int(baseSpeed - motor_speed_delta), 0, MAX_SPEED);
+    int left_motor_speed = constrain(int(currentBaseSpeed + delta), 0, MAX_SPEED);
+    int right_motor_speed = constrain(int(currentBaseSpeed - delta), 0, MAX_SPEED);
 
     setMotorSpeed(LEFT_MOTOR, left_motor_speed);
     setMotorSpeed(RIGHT_MOTOR, right_motor_speed);
 
     if (newBumperPress) {
+        setMotorSpeed(BOTH_MOTORS, 0);
+        lastError = 0;
+        integral = 0;
+        
         if (shot) {
-            setMotorSpeed(BOTH_MOTORS, 0);  // Stop motors
-            lastError = 0;
-            integral = 0;
-            lastPIDTime = millis();
+            // Second bumper hit - turn around
             delay(50);
             pendingDoneAfterTurn = true;
             state = State::TURN;
         } else {
-            setMotorSpeed(BOTH_MOTORS, 0);  // Stop motors
-            lastError = 0;
-            integral = 0;
-            lastPIDTime = millis();
-            delay(400);
+            // First bumper hit - shoot
+            delay(300);
             state = State::SHOOT;
         }
     }
@@ -278,17 +254,18 @@ void path() {
 }
 
 void shoot() {
-    delay(100);
-    if (hasShooter) {
-        // Serial.println("Shooting duck...");
-        digitalWrite(SHOOTER_PIN, HIGH);
-        delay(300);
-        digitalWrite(SHOOTER_PIN, LOW);
-        delay(50);
-    }
+    digitalWrite(SHOOTER_PIN, HIGH);
+    delay(300);
+    digitalWrite(SHOOTER_PIN, LOW);
+    delay(10);
     shot = true;
+    
+    // Reset PID before next move
+    lastError = 0;
+    integral = 0;
+    lastPIDTime = millis();
+    
     state = State::TURN;
-    returning = true;
 }
 
 void turn() {
@@ -323,18 +300,22 @@ void turn() {
         setMotorDirection(BOTH_MOTORS, MOTOR_DIR_FORWARD);
         turningStarted = false;
         
-        // Serial.println("Turn complete!");
-        
         // Reset encoders and PID for next path
         resetLeftEncoderCnt();
         resetRightEncoderCnt();
+
+        // Reset PID time so we don't have a huge dt step on resume
+        lastPIDTime = millis();
+        lastError = 0;
+        integral = 0;
 
         if (pendingDoneAfterTurn) {
             pendingDoneAfterTurn = false;
             state = State::DONE;
         } else {
-            pathStateStartTime = millis();
-            lastPIDTime = pathStateStartTime;
+            // Record encoder counts for return journey at normal speed
+            pathStartEncoderLeft = getEncoderLeftCnt();
+            pathStartEncoderRight = getEncoderRightCnt();
             state = State::PATH;
         }
     }
@@ -342,30 +323,10 @@ void turn() {
 
 void done() {
     setMotorSpeed(BOTH_MOTORS, 0);
-    // disableMotor(BOTH_MOTORS);
-    // Serial.println("DONE - Press button to restart");
-    // delay(1000);
     if (isButtonPressed() || (isBumperPressed() )) {
         shot = false;
         state = State::RESTART;
     }
-}
-
-// Helper functions
-float readHeadingDegrees() {
-    bno055_read_euler_hrp(&myEulerData);
-    return float(myEulerData.h) / 16.0f;
-}
-
-float calculateAngleDifference(float target, float current) {
-    float delta = target - current;
-    while (delta > 180.0f) {
-        delta -= 360.0f;
-    }
-    while (delta < -180.0f) {
-        delta += 360.0f;
-    }
-    return delta;
 }
 
 boolean isBumperPressed() {
