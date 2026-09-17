@@ -22,6 +22,4 @@ The launcher was a made with a very cheap brushed dc motor, a relay, and a coupl
 [CAD Model - Onshape](https://cad.onshape.com/documents/fea657253e3efcf7a8011b18/w/9f6b0cfca8e076060c58e5d4/e/e4dd6842f8802302730311c8)
 
 ## Scoring Website
-There is also a very basic score keeping html file included and hosted here: [github pages](https://purerandomgit.github.io/DuckLaucher/). 
-
-![WebsiteExample](ScoringWebsite.png)
+There is also a very basic score keeping HTML file included and hosted here: [Duck Pond Scoring Website](https://purerandomgit.github.io/DuckLaucher/).
