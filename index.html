@@ -1,604 +1,684 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Duck Pond Score</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
-    <link rel="icon" href="icon.png" type="image/png" sizes="32x32">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            overscroll-behavior-y: contain; 
-        }
-        /* Custom button active state for better touch feedback */
-        .btn-tap:active {
-            transform: scale(0.95);
-            opacity: 0.8;
-        }
-        .duck-icon {
-            width: 46px;
-            height: 46px;
-            object-fit: contain;
-        }
-        .duck-icon.flip {
-            transform: scaleX(-1);
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Duck Pond Score</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'] }
+      }
+    }
+  };
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="icon" href="icon.png" type="image/png" sizes="32x32">
 </head>
-<body class="min-h-screen flex flex-col bg-gradient-to-b from-sky-100 via-sky-200 to-teal-500 text-slate-900">
+<body class="min-h-screen flex flex-col bg-gradient-to-b from-sky-100 via-sky-200 to-teal-500 text-slate-900 font-sans">
 
-    <!-- Main Scoring Controls -->
-    <main class="flex-grow px-3 pt-4 pb-6 w-full max-w-sm mx-auto space-y-3">
-        <div class="text-center mb-1">
-            <p class="text-[9px] font-bold uppercase tracking-[0.55em] text-sky-800/70 mb-1">Total Score</p>
-            <div class="flex items-center justify-center gap-2 text-4xl font-black text-sky-900">
-                <img src="icon.png" alt="" aria-hidden="true" class="duck-icon flip">
-                <span id="total-display" class="tabular-nums tracking-tight leading-none">0</span>
-                <img src="icon.png" alt="" aria-hidden="true" class="duck-icon">
-            </div>
-        </div>
+<main class="flex-grow w-full max-w-sm mx-auto px-3 pt-5 pb-6 flex flex-col gap-3">
 
-        <section class="bg-white/70 rounded-2xl border border-sky-200 shadow-md shadow-sky-500/15 p-3 space-y-3">
-            <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.3em] text-sky-800/80">
-                <span>Timer</span>
-                <span id="timer-hint" class="text-[10px] text-slate-500">Ready to start</span>
-            </div>
+  <!-- Total score -->
+  <div class="text-center mb-1">
+    <p class="text-[25px] font-semibold text-slate-600 mb-1">Total score</p>
+    <div class="flex items-center justify-center gap-2">
+      <img src="icon.png" alt="" aria-hidden="true" class="w-11 h-11 object-contain -scale-x-100">
+      <span id="total-display" class="text-4xl font-black tracking-tight leading-none tabular-nums text-sky-900">0</span>
+      <img src="icon.png" alt="" aria-hidden="true" class="w-11 h-11 object-contain">
+    </div>
+  </div>
 
-            <!-- Setup Screen -->
-            <div id="timer-setup-screen" class="space-y-2">
-                <div class="flex flex-wrap items-center gap-2 text-xs">
-                    <label for="timer-start-input" class="uppercase tracking-[0.3em] text-slate-500 text-[10px]">Seconds</label>
-                    <input id="timer-start-input" type="number" min="5" max="3600" step="5" value="120" class="flex-1 min-w-[120px] rounded-lg border border-slate-200 bg-white/80 px-2 py-1.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-400" />
-                </div>
-                <button onclick="startFromSetup()" class="btn-tap w-full py-2 rounded-xl bg-sky-500/90 text-white text-sm font-semibold">Start</button>
-            </div>
+  <!-- Timer -->
+  <section class="bg-white/70 rounded-2xl p-3 flex flex-col gap-3">
+    <div class="text-center">
+      <p class="text-2xl font-bold text-slate-700">Timer</p>
+      <p id="timer-hint" class="text-[11px] font-medium text-slate-500 mt-0.5 min-h-[14px]"></p>
+    </div>
 
-            <!-- Running Screen -->
-            <div id="timer-running-screen" class="space-y-4 hidden">
-                <div id="timer-display" class="text-3xl font-black text-sky-900 text-center tabular-nums">00:00.000</div>
-                <div class="grid grid-cols-3 gap-2 text-xs font-semibold">
-                    <button onclick="startTimer()" class="btn-tap py-2 rounded-xl bg-sky-500/90 text-white">Start</button>
-                    <button onclick="pauseTimer()" class="btn-tap py-2 rounded-xl bg-amber-400/90 text-slate-900">Pause</button>
-                    <button onclick="stopTimer()" class="btn-tap py-2 rounded-xl bg-rose-400/90 text-white">Stop</button>
-                </div>
-                <div class="grid grid-cols-2 gap-2 text-xs font-semibold">
-                    <button onclick="adjustTimer(-30)" class="btn-tap py-2 rounded-xl bg-rose-100 text-rose-700 border border-rose-200 hover:bg-rose-200 transition-colors">Penalty -30s</button>
-                    <button onclick="adjustTimer(-5)" class="btn-tap py-2 rounded-xl bg-rose-100 text-rose-700 border border-rose-200 hover:bg-rose-200 transition-colors">Penalty -5s</button>
-                </div>
-            </div>
-        </section>
-        
-        <!-- 500 Point Zone -->
-        <div class="bg-white/80 rounded-2xl border border-amber-200 shadow h-20 overflow-hidden">
-            <div class="flex items-stretch h-full">
-                <button data-score-btn onclick="updateScore(-500)" class="btn-tap w-14 flex items-center justify-center text-amber-700 border-r border-amber-200 bg-amber-100/70" aria-label="Subtract 500">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>
-                </button>
-                <div class="flex-grow flex flex-col items-center justify-center gap-0.5 bg-gradient-to-b from-amber-50/80 to-white py-1.5">
-                    <span class="text-xl font-black leading-none text-amber-700">500</span>
-                    <span class="text-[9px] font-semibold uppercase tracking-[0.35em] text-amber-700/70">Points</span>
-                    <div>
-                        <span id="count-500" class="text-xl font-mono tracking-tight text-amber-800">x0</span>
-                    </div>
-                </div>
-                <button data-score-btn onclick="updateScore(500)" class="btn-tap w-16 flex items-center justify-center text-amber-950 bg-amber-400 font-semibold" aria-label="Add 500">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-                </button>
-            </div>
-        </div>
+    <!-- Setup screen -->
+    <div id="timer-setup-screen" class="flex flex-col gap-3">
+      <div class="grid grid-cols-[auto_auto_auto] items-center justify-center gap-x-1.5 gap-y-1">
+        <input id="timer-min-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="02"
+          class="w-16 text-center text-2xl font-extrabold tabular-nums text-sky-900 bg-sky-100 rounded-xl py-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2" aria-label="Minutes">
+        <span class="text-2xl font-extrabold text-sky-700 text-center">:</span>
+        <input id="timer-sec-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="00"
+          class="w-16 text-center text-2xl font-extrabold tabular-nums text-sky-900 bg-sky-100 rounded-xl py-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2" aria-label="Seconds">
+        <span class="text-[10px] font-bold tracking-wide uppercase text-slate-500 text-center">min</span>
+        <span></span>
+        <span class="text-[10px] font-bold tracking-wide uppercase text-slate-500 text-center">sec</span>
+      </div>
+      <div id="preset-row" class="flex flex-wrap items-center justify-center gap-1.5"></div>
+      <button onclick="startFromSetup()" class="w-full flex items-center justify-center gap-1.5 text-white font-bold text-sm rounded-xl py-3 bg-sky-500 transition-transform active:scale-95 active:opacity-80 motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        Start round
+      </button>
+    </div>
 
-        <!-- 300 Point Zone -->
-        <div class="bg-white/80 rounded-2xl border border-teal-200 shadow h-20 overflow-hidden">
-            <div class="flex items-stretch h-full">
-                <button data-score-btn onclick="updateScore(-300)" class="btn-tap w-14 flex items-center justify-center text-teal-700 border-r border-teal-200 bg-teal-100/70" aria-label="Subtract 300">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>
-                </button>
-                <div class="flex-grow flex flex-col items-center justify-center gap-0.5 bg-gradient-to-b from-teal-50/80 to-white py-1.5">
-                    <span class="text-xl font-black leading-none text-teal-700">300</span>
-                    <span class="text-[9px] font-semibold uppercase tracking-[0.35em] text-teal-700/70">Points</span>
-                    <div>
-                        <span id="count-300" class="text-xl font-mono tracking-tight text-teal-800">x0</span>
-                    </div>
-                </div>
-                <button data-score-btn onclick="updateScore(300)" class="btn-tap w-16 flex items-center justify-center text-teal-950 bg-teal-300 font-semibold" aria-label="Add 300">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-                </button>
-            </div>
-        </div>
-
-        <!-- 100 Point Zone -->
-        <div class="bg-white/80 rounded-2xl border border-sky-200 shadow h-20 overflow-hidden">
-            <div class="flex items-stretch h-full">
-                <button data-score-btn onclick="updateScore(-100)" class="btn-tap w-14 flex items-center justify-center text-sky-700 border-r border-sky-200 bg-sky-100/70" aria-label="Subtract 100">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>
-                </button>
-                <div class="flex-grow flex flex-col items-center justify-center gap-0.5 bg-gradient-to-b from-sky-50/80 to-white py-1.5">
-                    <span class="text-xl font-black leading-none text-sky-700">100</span>
-                    <span class="text-[9px] font-semibold uppercase tracking-[0.35em] text-sky-700/70">Points</span>
-                    <div>
-                        <span id="count-100" class="text-xl font-mono tracking-tight text-sky-800">x0</span>
-                    </div>
-                </div>
-                <button data-score-btn onclick="updateScore(100)" class="btn-tap w-16 flex items-center justify-center text-sky-950 bg-sky-300 font-semibold" aria-label="Add 100">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-                </button>
-            </div>
-        </div>
-
-        <!-- 50 Point Zone -->
-        <div class="bg-white/80 rounded-2xl border border-emerald-200 shadow h-20 overflow-hidden">
-            <div class="flex items-stretch h-full">
-                <button data-score-btn onclick="updateScore(-50)" class="btn-tap w-14 flex items-center justify-center text-emerald-700 border-r border-emerald-200 bg-emerald-100/70" aria-label="Subtract 50">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>
-                </button>
-                <div class="flex-grow flex flex-col items-center justify-center gap-0.5 bg-gradient-to-b from-emerald-50/80 to-white py-1.5">
-                    <span class="text-xl font-black leading-none text-emerald-700">50</span>
-                    <span class="text-[9px] font-semibold uppercase tracking-[0.35em] text-emerald-700/70">Points</span>
-                    <div>
-                        <span id="count-50" class="text-xl font-mono tracking-tight text-emerald-800">x0</span>
-                    </div>
-                </div>
-                <button data-score-btn onclick="updateScore(50)" class="btn-tap w-16 flex items-center justify-center text-emerald-950 bg-emerald-300 font-semibold" aria-label="Add 50">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-                </button>
-            </div>
-        </div>
-
-        <!-- Stats Panel -->
-        <section class="bg-white/80 rounded-2xl border border-white/80 shadow-lg shadow-sky-500/10 p-3 space-y-3">
-            <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.3em] text-slate-700">
-                <span>Stats</span>
-                <span class="text-[9px] text-slate-500">Live session</span>
-            </div>
-            <div class="grid grid-cols-2 gap-3 text-center">
-                <div>
-                    <p class="text-[10px] uppercase tracking-[0.3em] text-slate-600">Total Ducks</p>
-                    <p id="stats-total" class="text-2xl font-black text-slate-900">0</p>
-                </div>
-                <div>
-                    <p class="text-[10px] uppercase tracking-[0.3em] text-slate-600">Ducks / min</p>
-                    <p id="stats-ducks-per-minute" class="text-2xl font-black text-slate-900">0</p>
-                </div>
-                <div>
-                    <p class="text-[10px] uppercase tracking-[0.3em] text-slate-600">Sec / duck</p>
-                    <p id="stats-seconds-per-duck" class="text-2xl font-black text-slate-900">—</p>
-                </div>
-                <div>
-                    <p class="text-[10px] uppercase tracking-[0.3em] text-slate-600">Bonus Cups</p>
-                    <p id="stats-bonus" class="text-2xl font-black text-emerald-800">0</p>
-                </div>
-            </div>
-            <div class="space-y-3">
-                <div>
-                    <p class="text-[10px] uppercase tracking-[0.3em] text-slate-600">Hit mix</p>
-                    <div class="space-y-1.5 text-[11px]">
-                        <div>
-                            <div class="flex justify-between text-slate-700 font-semibold"><span>500</span><span id="stats-percent-500">0%</span></div>
-                            <div class="h-1.5 rounded-full bg-white shadow-inner shadow-slate-200 border border-white/70">
-                                <div id="stats-bar-500" class="h-full rounded-full bg-amber-400 transition-all" style="width:0%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between text-slate-700 font-semibold"><span>300</span><span id="stats-percent-300">0%</span></div>
-                            <div class="h-1.5 rounded-full bg-white shadow-inner shadow-slate-200 border border-white/70">
-                                <div id="stats-bar-300" class="h-full rounded-full bg-teal-400 transition-all" style="width:0%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between text-slate-700 font-semibold"><span>100</span><span id="stats-percent-100">0%</span></div>
-                            <div class="h-1.5 rounded-full bg-white shadow-inner shadow-slate-200 border border-white/70">
-                                <div id="stats-bar-100" class="h-full rounded-full bg-sky-400 transition-all" style="width:0%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between text-slate-700 font-semibold"><span>50</span><span id="stats-percent-50">0%</span></div>
-                            <div class="h-1.5 rounded-full bg-white shadow-inner shadow-slate-200 border border-white/70">
-                                <div id="stats-bar-50" class="h-full rounded-full bg-emerald-400 transition-all" style="width:0%"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <p class="text-[10px] uppercase tracking-[0.3em] text-slate-600">Points share</p>
-                    <div class="space-y-1.5 text-[11px]">
-                        <div>
-                            <div class="flex justify-between text-slate-700 font-semibold"><span>500</span><span id="stats-points-percent-500">0%</span></div>
-                            <div class="h-1.5 rounded-full bg-white shadow-inner shadow-slate-200 border border-white/70">
-                                <div id="stats-points-bar-500" class="h-full rounded-full bg-amber-600 transition-all" style="width:0%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between text-slate-700 font-semibold"><span>300</span><span id="stats-points-percent-300">0%</span></div>
-                            <div class="h-1.5 rounded-full bg-white shadow-inner shadow-slate-200 border border-white/70">
-                                <div id="stats-points-bar-300" class="h-full rounded-full bg-teal-600 transition-all" style="width:0%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between text-slate-700 font-semibold"><span>100</span><span id="stats-points-percent-100">0%</span></div>
-                            <div class="h-1.5 rounded-full bg-white shadow-inner shadow-slate-200 border border-white/70">
-                                <div id="stats-points-bar-100" class="h-full rounded-full bg-sky-600 transition-all" style="width:0%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between text-slate-700 font-semibold"><span>50</span><span id="stats-points-percent-50">0%</span></div>
-                            <div class="h-1.5 rounded-full bg-white shadow-inner shadow-slate-200 border border-white/70">
-                                <div id="stats-points-bar-50" class="h-full rounded-full bg-emerald-600 transition-all" style="width:0%"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-    </main>
-
-    <!-- Footer Actions -->
-    <footer class="px-3 pb-6 w-full max-w-sm mx-auto">
-        <button onclick="resetScore()" class="btn-tap w-full py-3 rounded-2xl border border-sky-300 text-sky-900 font-bold uppercase tracking-[0.35em] bg-white/70 backdrop-blur flex items-center justify-center gap-2 shadow-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-            Reset Score
+    <!-- Running screen -->
+    <div id="timer-running-screen" class="hidden flex-col gap-3">
+      <div id="timer-display" class="text-center text-3xl font-black tabular-nums text-sky-900">00:00.000</div>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="play-pause-btn" onclick="togglePlayPause()" class="flex items-center justify-center gap-1.5 font-bold text-sm rounded-xl py-3 bg-amber-400 text-slate-900 transition-transform active:scale-95 active:opacity-80 motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2">
+          <svg id="play-pause-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+          <span id="play-pause-label">Pause</span>
         </button>
-    </footer>
+        <button onclick="stopTimer()" class="flex items-center justify-center gap-1.5 font-bold text-sm rounded-xl py-3 bg-rose-400 text-white transition-transform active:scale-95 active:opacity-80 motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+          Stop
+        </button>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <button onclick="adjustTimer(-30)" class="font-bold text-sm rounded-xl py-3 bg-rose-200 text-rose-700 transition-transform active:scale-95 active:opacity-80 motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2">Penalty −30s</button>
+        <button onclick="adjustTimer(-5)" class="font-bold text-sm rounded-xl py-3 bg-rose-200 text-rose-700 transition-transform active:scale-95 active:opacity-80 motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2">Penalty −5s</button>
+      </div>
+    </div>
+  </section>
 
-    <script>
-    const SCORING_ZONES = [500, 300, 100];
-    const BONUS_ZONE = 50;
-    const MIN_RATE_SAMPLE_MS = 2000;
-    const MIN_RATE_SAMPLE_HITS = 2;
+  <!-- Score zones -->
+  <div class="flex items-stretch h-20 rounded-2xl overflow-hidden">
+    <button data-score-btn onclick="updateScore(-500)" aria-label="Subtract 500 points" class="w-[3.25rem] flex-shrink-0 flex items-center justify-center text-amber-700 bg-amber-100 transition-transform active:scale-95 active:opacity-80 motion-reduce:transition-none disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-inset">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/></svg>
+    </button>
+    <div class="flex-grow flex flex-col items-center justify-center gap-0.5 bg-amber-50 text-amber-700">
+      <span class="text-2xl font-black leading-none">500</span>
+      <span class="text-[9.5px] font-bold tracking-widest uppercase opacity-75">points</span>
+      <span id="count-500" class="text-lg font-bold tabular-nums text-amber-800 mt-0.5">×0</span>
+    </div>
+    <button data-score-btn onclick="updateScore(500)" aria-label="Add 500 points" class="w-16 flex-shrink-0 flex items-center justify-center text-amber-950 bg-amber-400 transition-transform active:scale-95 active:opacity-80 motion-reduce:transition-none disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-inset">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+    </button>
+  </div>
 
-        let currentScore = 0;
-        let counts = {
-            500: 0,
-            300: 0,
-            100: 0,
-            50: 0
-        };
+  <div class="flex items-stretch h-20 rounded-2xl overflow-hidden">
+    <button data-score-btn onclick="updateScore(-300)" aria-label="Subtract 300 points" class="w-[3.25rem] flex-shrink-0 flex items-center justify-center text-teal-700 bg-teal-100 transition-transform active:scale-95 active:opacity-80 motion-reduce:transition-none disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-inset">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/></svg>
+    </button>
+    <div class="flex-grow flex flex-col items-center justify-center gap-0.5 bg-teal-50 text-teal-700">
+      <span class="text-2xl font-black leading-none">300</span>
+      <span class="text-[9.5px] font-bold tracking-widest uppercase opacity-75">points</span>
+      <span id="count-300" class="text-lg font-bold tabular-nums text-teal-800 mt-0.5">×0</span>
+    </div>
+    <button data-score-btn onclick="updateScore(300)" aria-label="Add 300 points" class="w-16 flex-shrink-0 flex items-center justify-center text-teal-950 bg-teal-300 transition-transform active:scale-95 active:opacity-80 motion-reduce:transition-none disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-inset">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+    </button>
+  </div>
 
-        const displayElement = document.getElementById('total-display');
-        const timerDisplay = document.getElementById('timer-display');
-        const timerStartInput = document.getElementById('timer-start-input');
-        const timerSetupScreen = document.getElementById('timer-setup-screen');
-        const timerRunningScreen = document.getElementById('timer-running-screen');
-        const timerHint = document.getElementById('timer-hint');
+  <div class="flex items-stretch h-20 rounded-2xl overflow-hidden">
+    <button data-score-btn onclick="updateScore(-100)" aria-label="Subtract 100 points" class="w-[3.25rem] flex-shrink-0 flex items-center justify-center text-sky-700 bg-sky-100 transition-transform active:scale-95 active:opacity-80 motion-reduce:transition-none disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-inset">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/></svg>
+    </button>
+    <div class="flex-grow flex flex-col items-center justify-center gap-0.5 bg-sky-50 text-sky-700">
+      <span class="text-2xl font-black leading-none">100</span>
+      <span class="text-[9.5px] font-bold tracking-widest uppercase opacity-75">points</span>
+      <span id="count-100" class="text-lg font-bold tabular-nums text-sky-800 mt-0.5">×0</span>
+    </div>
+    <button data-score-btn onclick="updateScore(100)" aria-label="Add 100 points" class="w-16 flex-shrink-0 flex items-center justify-center text-sky-950 bg-sky-300 transition-transform active:scale-95 active:opacity-80 motion-reduce:transition-none disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-inset">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+    </button>
+  </div>
 
-        const statsTotal = document.getElementById('stats-total');
-        const statsDucksPerMinute = document.getElementById('stats-ducks-per-minute');
-        const statsSecondsPerDuck = document.getElementById('stats-seconds-per-duck');
-        const statsBonus = document.getElementById('stats-bonus');
-        const statsPercent = {
-            500: document.getElementById('stats-percent-500'),
-            300: document.getElementById('stats-percent-300'),
-            100: document.getElementById('stats-percent-100'),
-            50: document.getElementById('stats-percent-50')
-        };
-        const statsBars = {
-            500: document.getElementById('stats-bar-500'),
-            300: document.getElementById('stats-bar-300'),
-            100: document.getElementById('stats-bar-100'),
-            50: document.getElementById('stats-bar-50')
-        };
-        const statsPointsPercent = {
-            500: document.getElementById('stats-points-percent-500'),
-            300: document.getElementById('stats-points-percent-300'),
-            100: document.getElementById('stats-points-percent-100'),
-            50: document.getElementById('stats-points-percent-50')
-        };
-        const statsPointsBars = {
-            500: document.getElementById('stats-points-bar-500'),
-            300: document.getElementById('stats-points-bar-300'),
-            100: document.getElementById('stats-points-bar-100'),
-            50: document.getElementById('stats-points-bar-50')
-        };
-        const scoreButtons = Array.from(document.querySelectorAll('[data-score-btn]'));
+  <div class="flex items-stretch h-20 rounded-2xl overflow-hidden">
+    <button data-score-btn onclick="updateScore(-50)" aria-label="Subtract 50 points" class="w-[3.25rem] flex-shrink-0 flex items-center justify-center text-emerald-700 bg-emerald-100 transition-transform active:scale-95 active:opacity-80 motion-reduce:transition-none disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-inset">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/></svg>
+    </button>
+    <div class="flex-grow flex flex-col items-center justify-center gap-0.5 bg-emerald-50 text-emerald-700">
+      <span class="text-2xl font-black leading-none">50</span>
+      <span class="text-[9.5px] font-bold tracking-widest uppercase opacity-75">bonus cup</span>
+      <span id="count-50" class="text-lg font-bold tabular-nums text-emerald-800 mt-0.5">×0</span>
+    </div>
+    <button data-score-btn onclick="updateScore(50)" aria-label="Add 50 points" class="w-16 flex-shrink-0 flex items-center justify-center text-emerald-950 bg-emerald-300 transition-transform active:scale-95 active:opacity-80 motion-reduce:transition-none disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-inset">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+    </button>
+  </div>
 
-        let timerStartSeconds = normalizeTimerValue(timerStartInput ? parseInt(timerStartInput.value, 10) : 600);
-        let timerRemainingMs = timerStartSeconds * 1000;
-        let timerInterval = null;
-        let timerTargetEndTs = null;
-        let sessionStartTimestamp = null;
-        let scoringLocked = false;
-        let lockoutTimeout = null;
-        let blinkInterval = null;
+  <!-- Stats -->
+  <section class="bg-white rounded-2xl p-3 flex flex-col gap-3">
+    <p class="text-center text-sm font-bold text-slate-700">Stats</p>
+    <div class="grid grid-cols-2 gap-3 text-center">
+      <div>
+        <p class="text-[15px] font-semibold text-slate-600 mb-0.5">Total Ducks</p>
+        <p id="stats-total" class="text-2xl font-black tabular-nums text-slate-900">0</p>
+      </div>
+      <div>
+        <p class="text-[15px] font-semibold text-slate-600 mb-0.5">Ducks Per Min</p>
+        <p id="stats-ducks-per-minute" class="text-2xl font-black tabular-nums text-slate-900">0</p>
+      </div>
+      <div>
+        <p class="text-[15px] font-semibold text-slate-600 mb-0.5">Seconds Per Duck</p>
+        <p id="stats-seconds-per-duck" class="text-2xl font-black tabular-nums text-slate-900">—</p>
+      </div>
+      <div>
+        <p class="text-[15px] font-semibold text-slate-600 mb-0.5">Bonus Dups</p>
+        <p id="stats-bonus" class="text-2xl font-black tabular-nums text-slate-900">0</p>
+      </div>
+    </div>
 
-        if (timerStartInput) {
-            timerStartInput.value = timerStartSeconds;
-        }
-        setScoringLocked(false);
-        updateStats();
+    <div class="flex flex-col gap-2">
+      <p class="text-[15px] font-semibold text-slate-600">Catch mix</p>
+      <div class="flex flex-col gap-1.5">
+        <div>
+          <div class="flex justify-between text-[11px] font-semibold text-slate-700"><span>500</span><span id="stats-percent-500">0%</span></div>
+          <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div id="stats-bar-500" class="h-full rounded-full bg-amber-400 motion-safe:transition-all" style="width:0%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-[11px] font-semibold text-slate-700"><span>300</span><span id="stats-percent-300">0%</span></div>
+          <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div id="stats-bar-300" class="h-full rounded-full bg-teal-400 motion-safe:transition-all" style="width:0%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-[11px] font-semibold text-slate-700"><span>100</span><span id="stats-percent-100">0%</span></div>
+          <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div id="stats-bar-100" class="h-full rounded-full bg-sky-400 motion-safe:transition-all" style="width:0%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-[11px] font-semibold text-slate-700"><span>50</span><span id="stats-percent-50">0%</span></div>
+          <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div id="stats-bar-50" class="h-full rounded-full bg-emerald-400 motion-safe:transition-all" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <p class="text-[15px] font-semibold text-slate-600">Points breakdown</p>
+      <div class="flex flex-col gap-1.5">
+        <div>
+          <div class="flex justify-between text-[11px] font-semibold text-slate-700"><span>500</span><span id="stats-points-percent-500">0%</span></div>
+          <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div id="stats-points-bar-500" class="h-full rounded-full bg-amber-600 motion-safe:transition-all" style="width:0%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-[11px] font-semibold text-slate-700"><span>300</span><span id="stats-points-percent-300">0%</span></div>
+          <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div id="stats-points-bar-300" class="h-full rounded-full bg-teal-600 motion-safe:transition-all" style="width:0%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-[11px] font-semibold text-slate-700"><span>100</span><span id="stats-points-percent-100">0%</span></div>
+          <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div id="stats-points-bar-100" class="h-full rounded-full bg-sky-600 motion-safe:transition-all" style="width:0%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-[11px] font-semibold text-slate-700"><span>50</span><span id="stats-points-percent-50">0%</span></div>
+          <div class="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div id="stats-points-bar-50" class="h-full rounded-full bg-emerald-600 motion-safe:transition-all" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="w-full max-w-sm mx-auto px-3 pb-6">
+  <button onclick="openResetModal()" class="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white/70 text-sky-900 font-bold uppercase tracking-[0.2em] text-xs transition-transform active:scale-95 active:opacity-80 motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+    Reset score
+  </button>
+</footer>
+
+<!-- Reset confirmation modal -->
+<div id="reset-modal-backdrop" onclick="handleBackdropClick(event)" class="hidden fixed inset-0 items-center justify-center bg-slate-900/55 p-5 z-50">
+  <div id="reset-modal-panel" role="dialog" aria-modal="true" aria-labelledby="reset-modal-title" class="bg-white text-slate-900 rounded-2xl max-w-sm w-full p-6">
+    <h2 id="reset-modal-title" class="text-lg font-black mb-2">Reset the score?</h2>
+    <p class="text-sm text-slate-600 mb-5">This clears the total score, every duck count, and the session stats. The round timer isn't affected.</p>
+    <div class="grid grid-cols-2 gap-2">
+      <button onclick="closeResetModal()" class="py-3 rounded-xl bg-slate-200 text-slate-900 font-bold text-sm transition-transform active:scale-95 active:opacity-80 motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2">Cancel</button>
+      <button id="reset-modal-confirm" onclick="confirmResetScore()" class="py-3 rounded-xl bg-rose-400 text-white font-bold text-sm transition-transform active:scale-95 active:opacity-80 motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2">Reset</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const SCORING_ZONES = [500, 300, 100];
+  const BONUS_ZONE = 50;
+  const MIN_RATE_SAMPLE_MS = 2000;
+  const MIN_RATE_SAMPLE_HITS = 2;
+  const STORAGE_KEY = 'duckPondScoreData';
+  const PRESETS = [60, 90, 120, 180, 300];
+
+  let currentScore = 0;
+  let counts = { 500: 0, 300: 0, 100: 0, 50: 0 };
+
+  // Round timer state
+  let timerStartSeconds = 120;
+  let timerRemainingMs = timerStartSeconds * 1000;
+  let timerInterval = null;
+  let timerTargetEndTs = null;
+  let scoringLocked = false;
+  let lockoutTimeout = null;
+  let blinkInterval = null;
+
+  // Session clock: accumulates only while the round timer is actively running,
+  // so ducks/min and sec/duck stay accurate through pauses.
+  let sessionElapsedMs = 0;
+  let sessionRunning = false;
+  let sessionResumeTs = null;
+
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let lastFocusedBeforeModal = null;
+
+  // DOM refs
+  const displayElement = document.getElementById('total-display');
+  const timerDisplay = document.getElementById('timer-display');
+  const timerMinInput = document.getElementById('timer-min-input');
+  const timerSecInput = document.getElementById('timer-sec-input');
+  const timerSetupScreen = document.getElementById('timer-setup-screen');
+  const timerRunningScreen = document.getElementById('timer-running-screen');
+  const timerHint = document.getElementById('timer-hint');
+  const presetRow = document.getElementById('preset-row');
+  const playPauseBtn = document.getElementById('play-pause-btn');
+  const playPauseLabel = document.getElementById('play-pause-label');
+  const playPauseIcon = document.getElementById('play-pause-icon');
+
+  const statsTotal = document.getElementById('stats-total');
+  const statsDucksPerMinute = document.getElementById('stats-ducks-per-minute');
+  const statsSecondsPerDuck = document.getElementById('stats-seconds-per-duck');
+  const statsBonus = document.getElementById('stats-bonus');
+  const statsPercent = { 500: document.getElementById('stats-percent-500'), 300: document.getElementById('stats-percent-300'), 100: document.getElementById('stats-percent-100'), 50: document.getElementById('stats-percent-50') };
+  const statsBars = { 500: document.getElementById('stats-bar-500'), 300: document.getElementById('stats-bar-300'), 100: document.getElementById('stats-bar-100'), 50: document.getElementById('stats-bar-50') };
+  const statsPointsPercent = { 500: document.getElementById('stats-points-percent-500'), 300: document.getElementById('stats-points-percent-300'), 100: document.getElementById('stats-points-percent-100'), 50: document.getElementById('stats-points-percent-50') };
+  const statsPointsBars = { 500: document.getElementById('stats-points-bar-500'), 300: document.getElementById('stats-points-bar-300'), 100: document.getElementById('stats-points-bar-100'), 50: document.getElementById('stats-points-bar-50') };
+  const scoreButtons = Array.from(document.querySelectorAll('[data-score-btn]'));
+  const resetModalBackdrop = document.getElementById('reset-modal-backdrop');
+  const resetModalConfirm = document.getElementById('reset-modal-confirm');
+
+  function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  // ---------- persistence ----------
+  function loadPersisted() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (typeof data.score === 'number') currentScore = data.score;
+      if (data.counts) counts = Object.assign({ 500: 0, 300: 0, 100: 0, 50: 0 }, data.counts);
+      if (typeof data.timerStartSeconds === 'number' && data.timerStartSeconds > 0) {
+        timerStartSeconds = clamp(Math.round(data.timerStartSeconds), 5, 3600);
+        timerRemainingMs = timerStartSeconds * 1000;
+      }
+    } catch (e) { /* ignore corrupt/unavailable storage */ }
+  }
+
+  function savePersisted() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ score: currentScore, counts: counts, timerStartSeconds: timerStartSeconds }));
+    } catch (e) { /* storage unavailable — app still works, just won't persist */ }
+  }
+
+  // ---------- session clock (pause-aware) ----------
+  function resumeSessionClock() {
+    if (sessionRunning) return;
+    sessionRunning = true;
+    sessionResumeTs = performance.now();
+  }
+  function pauseSessionClock() {
+    if (!sessionRunning) return;
+    sessionElapsedMs += performance.now() - sessionResumeTs;
+    sessionRunning = false;
+    sessionResumeTs = null;
+  }
+  function resetSessionClock() {
+    sessionElapsedMs = 0;
+    sessionRunning = false;
+    sessionResumeTs = null;
+  }
+  function getSessionElapsedMs() {
+    return sessionRunning ? sessionElapsedMs + (performance.now() - sessionResumeTs) : sessionElapsedMs;
+  }
+
+  // ---------- scoring ----------
+  function setScoringLocked(locked) {
+    scoringLocked = !!locked;
+    scoreButtons.forEach(function (btn) {
+      btn.disabled = scoringLocked;
+    });
+  }
+
+  window.updateScore = function (amount) {
+    if (scoringLocked) {
+      if (timerHint) timerHint.innerText = 'Scoring locked — please wait…';
+      return;
+    }
+    currentScore += amount;
+    const zone = Math.abs(amount);
+    if (amount > 0) counts[zone]++; else counts[zone]--;
+    saveAndUpdate();
+  };
+
+  window.openResetModal = function () {
+    lastFocusedBeforeModal = document.activeElement;
+    resetModalBackdrop.classList.remove('hidden');
+    resetModalBackdrop.classList.add('flex');
+    document.addEventListener('keydown', handleModalKeydown);
+    resetModalConfirm.focus();
+  };
+  window.closeResetModal = function () {
+    resetModalBackdrop.classList.remove('flex');
+    resetModalBackdrop.classList.add('hidden');
+    document.removeEventListener('keydown', handleModalKeydown);
+    if (lastFocusedBeforeModal && typeof lastFocusedBeforeModal.focus === 'function') {
+      lastFocusedBeforeModal.focus();
+    }
+  };
+  window.confirmResetScore = function () {
+    currentScore = 0;
+    counts = { 500: 0, 300: 0, 100: 0, 50: 0 };
+    setScoringLocked(false);
+    resetSessionClock();
+    saveAndUpdate();
+    closeResetModal();
+  };
+  window.handleBackdropClick = function (evt) {
+    if (evt.target === resetModalBackdrop) closeResetModal();
+  };
+  function handleModalKeydown(e) {
+    if (e.key === 'Escape') closeResetModal();
+  }
+
+  function saveAndUpdate() {
+    updateDisplay();
+    savePersisted();
+  }
+
+  function updateDisplay() {
+    displayElement.innerText = currentScore.toLocaleString();
+    document.getElementById('count-500').innerText = 'x' + counts[500];
+    document.getElementById('count-300').innerText = 'x' + counts[300];
+    document.getElementById('count-100').innerText = 'x' + counts[100];
+    document.getElementById('count-50').innerText = 'x' + counts[50];
+    updateStats();
+  }
+
+  function updateStats() {
+    if (!statsTotal) return;
+    const positiveCounts = {
+      500: Math.max(0, counts[500]),
+      300: Math.max(0, counts[300]),
+      100: Math.max(0, counts[100]),
+      50: Math.max(0, counts[50])
+    };
+    const scorableHits = SCORING_ZONES.reduce(function (sum, zone) { return sum + positiveCounts[zone]; }, 0);
+    const totalHitsForMix = scorableHits + positiveCounts[BONUS_ZONE];
+    const totalPointsScored = SCORING_ZONES.reduce(function (sum, zone) { return sum + positiveCounts[zone] * zone; }, 0) + positiveCounts[BONUS_ZONE] * BONUS_ZONE;
+
+    if (statsBonus) statsBonus.innerText = positiveCounts[BONUS_ZONE].toLocaleString();
+
+    const elapsedMs = getSessionElapsedMs();
+
+    if (scorableHits === 0) {
+      statsTotal.innerText = '0';
+      statsDucksPerMinute.innerText = '0';
+      statsSecondsPerDuck.innerText = '—';
+    } else {
+      statsTotal.innerText = scorableHits.toLocaleString();
+      const enoughHits = scorableHits >= MIN_RATE_SAMPLE_HITS;
+      const enoughTime = elapsedMs >= MIN_RATE_SAMPLE_MS;
+      const canShowRates = (enoughHits || enoughTime) && elapsedMs > 0;
+      if (canShowRates) {
+        const elapsedMinutes = elapsedMs / 60000;
+        const ducksPerMinute = scorableHits / elapsedMinutes;
+        const secondsPerDuck = (elapsedMs / 1000) / scorableHits;
+        statsDucksPerMinute.innerText = ducksPerMinute.toFixed(1);
+        statsSecondsPerDuck.innerText = secondsPerDuck.toFixed(1);
+      } else {
+        statsDucksPerMinute.innerText = '—';
+        statsSecondsPerDuck.innerText = '—';
+      }
+    }
+
+    [500, 300, 100, 50].forEach(function (zone) {
+      const count = positiveCounts[zone];
+      const percent = totalHitsForMix === 0 ? 0 : (count / totalHitsForMix) * 100;
+      if (statsPercent[zone]) statsPercent[zone].innerText = percent.toFixed(0) + '%';
+      if (statsBars[zone]) statsBars[zone].style.width = percent + '%';
+      const pointsPercent = totalPointsScored === 0 ? 0 : ((count * zone) / totalPointsScored) * 100;
+      if (statsPointsPercent[zone]) statsPointsPercent[zone].innerText = pointsPercent.toFixed(0) + '%';
+      if (statsPointsBars[zone]) statsPointsBars[zone].style.width = pointsPercent + '%';
+    });
+  }
+
+  // ---------- timer field handling (mm:ss, always 2 digits) ----------
+  function readTimerFieldsSeconds() {
+    let min = parseInt(timerMinInput.value, 10);
+    let sec = parseInt(timerSecInput.value, 10);
+    if (isNaN(min)) min = 0;
+    if (isNaN(sec)) sec = 0;
+    min = clamp(min, 0, 60);
+    sec = clamp(sec, 0, 59);
+    return min * 60 + sec;
+  }
+
+  function writeTimerFieldsFromSeconds(totalSeconds) {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    timerMinInput.value = pad2(m);
+    timerSecInput.value = pad2(s);
+  }
+
+  function normalizeAndSyncTimerFields() {
+    let total = readTimerFieldsSeconds();
+    total = clamp(total, 5, 3600);
+    writeTimerFieldsFromSeconds(total);
+    syncPresetHighlight(total);
+    return total;
+  }
+
+  // Allow only digits while typing, cap at 2 characters; pad/clamp on blur.
+  function attachDigitField(input) {
+    input.addEventListener('input', function () {
+      input.value = input.value.replace(/[^0-9]/g, '').slice(0, 2);
+    });
+    input.addEventListener('focus', function () {
+      input.select();
+    });
+    input.addEventListener('blur', function () {
+      savePersistedTimerOnly();
+    });
+  }
+  attachDigitField(timerMinInput);
+  attachDigitField(timerSecInput);
+
+  function savePersistedTimerOnly() {
+    const total = normalizeAndSyncTimerFields();
+    timerStartSeconds = total;
+    timerRemainingMs = total * 1000;
+    updateTimerDisplay();
+    savePersisted();
+  }
+
+  function buildPresetRow() {
+    presetRow.innerHTML = '';
+    PRESETS.forEach(function (secs) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'preset-chip text-xs font-bold px-3 py-1.5 rounded-full bg-sky-100 text-sky-700 transition-transform active:scale-95 active:opacity-80 motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900';
+      btn.dataset.seconds = secs;
+      const m = Math.floor(secs / 60), s = secs % 60;
+      btn.innerText = pad2(m) + ':' + pad2(s);
+      btn.onclick = function () {
+        writeTimerFieldsFromSeconds(secs);
+        const total = normalizeAndSyncTimerFields();
+        timerStartSeconds = total;
+        timerRemainingMs = total * 1000;
         updateTimerDisplay();
+        savePersisted();
+      };
+      presetRow.appendChild(btn);
+    });
+  }
 
-        // Initialize from localStorage if available
-        if(localStorage.getItem('simpleScoreKeeperData')) {
-            const data = JSON.parse(localStorage.getItem('simpleScoreKeeperData'));
-            currentScore = data.score || 0;
-            counts = data.counts || { 500: 0, 300: 0, 100: 0, 50: 0 };
-            updateDisplay();
-        }
+  function syncPresetHighlight(currentTotal) {
+    Array.from(presetRow.children).forEach(function (chip) {
+      const active = parseInt(chip.dataset.seconds, 10) === currentTotal;
+      chip.classList.toggle('bg-sky-900', active);
+      chip.classList.toggle('text-white', active);
+      chip.classList.toggle('bg-sky-100', !active);
+      chip.classList.toggle('text-sky-700', !active);
+    });
+  }
 
-        function setScoringLocked(locked) {
-            scoringLocked = !!locked;
-            scoreButtons.forEach(btn => {
-                btn.disabled = scoringLocked;
-                btn.classList.toggle('opacity-50', scoringLocked);
-                btn.classList.toggle('cursor-not-allowed', scoringLocked);
-            });
-        }
+  // ---------- timer control ----------
+  window.startFromSetup = function () {
+    const total = normalizeAndSyncTimerFields();
+    timerStartSeconds = total;
+    timerRemainingMs = total * 1000;
+    savePersisted();
+    updateTimerDisplay();
+    startTimer();
+  };
 
-        function updateScore(amount) {
-            if (scoringLocked) {
-                if (timerHint) {
-                    timerHint.innerText = 'Scoring locked — please wait...';
-                }
-                return;
-            }
-            currentScore += amount;
-            
-            // Update individual counts
-            const zone = Math.abs(amount);
-            if (amount > 0) {
-                counts[zone]++;
-            } else {
-                // Decrement but allow negative if correcting a mistake? 
-                // Or floor at 0? Standard scorekeeping usually allows full correction.
-                counts[zone]--; 
-            }
+  function startTimer() {
+    if (timerInterval || timerRemainingMs <= 0) return;
+    const now = performance.now();
+    timerTargetEndTs = now + timerRemainingMs;
+    setScoringLocked(false);
+    setTimerState('running');
+    resumeSessionClock();
+    updatePlayPauseUI(true);
+    timerHint.innerText = 'Timer running';
+    timerInterval = requestAnimationFrame(tickTimer);
+  }
 
-            saveAndUpdate();
-        }
+  function tickTimer() {
+    if (!timerTargetEndTs) return;
+    const now = performance.now();
+    timerRemainingMs = Math.max(0, timerTargetEndTs - now);
+    updateTimerDisplay();
+    updateStats();
+    if (timerRemainingMs <= 0) {
+      finishTimer();
+    } else if (timerInterval) {
+      timerInterval = requestAnimationFrame(tickTimer);
+    }
+  }
 
-        function resetScore() {
-            if(confirm("Are you sure you want to reset the score to 0?")) {
-                currentScore = 0;
-                counts = { 500: 0, 300: 0, 100: 0, 50: 0 };
-                setScoringLocked(false);
-                saveAndUpdate();
-            }
-        }
+  function pauseTimer() {
+    if (!timerInterval) return;
+    cancelAnimationFrame(timerInterval);
+    timerInterval = null;
+    timerTargetEndTs = null;
+    pauseSessionClock();
+    updatePlayPauseUI(false);
+    timerHint.innerText = 'Paused';
+    updateStats();
+  }
 
-        function saveAndUpdate() {
-            updateDisplay();
-            localStorage.setItem('simpleScoreKeeperData', JSON.stringify({
-                score: currentScore,
-                counts: counts
-            }));
-        }
-        
-        function updateDisplay() {
-            // Update Main Score
-            displayElement.innerText = currentScore.toLocaleString();
-            
-            // Update Counts
-            document.getElementById('count-500').innerText = `x${counts[500]}`;
-            document.getElementById('count-300').innerText = `x${counts[300]}`;
-            document.getElementById('count-100').innerText = `x${counts[100]}`;
-            document.getElementById('count-50').innerText = `x${counts[50]}`;
-            updateStats();
-        }
+  window.togglePlayPause = function () {
+    if (timerInterval) pauseTimer(); else startTimer();
+  };
 
-        function updateStats() {
-            if (!statsTotal) return;
-            const positiveCounts = {
-                500: Math.max(0, counts[500]),
-                300: Math.max(0, counts[300]),
-                100: Math.max(0, counts[100]),
-                50: Math.max(0, counts[50])
-            };
-            const scorableHits = SCORING_ZONES.reduce((sum, zone) => sum + positiveCounts[zone], 0);
-            const totalHitsForMix = scorableHits + positiveCounts[BONUS_ZONE];
-            const totalPointsScored = SCORING_ZONES.reduce((sum, zone) => sum + positiveCounts[zone] * zone, 0) + positiveCounts[BONUS_ZONE] * BONUS_ZONE;
+  function updatePlayPauseUI(isRunning) {
+    if (isRunning) {
+      playPauseLabel.innerText = 'Pause';
+      playPauseIcon.innerHTML = '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>';
+      playPauseBtn.classList.remove('bg-sky-500', 'text-white');
+      playPauseBtn.classList.add('bg-amber-400', 'text-slate-900');
+    } else {
+      playPauseLabel.innerText = 'Resume';
+      playPauseIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+      playPauseBtn.classList.remove('bg-amber-400', 'text-slate-900');
+      playPauseBtn.classList.add('bg-sky-500', 'text-white');
+    }
+  }
 
-            if (statsBonus) {
-                statsBonus.innerText = positiveCounts[BONUS_ZONE].toLocaleString();
-            }
-            if (scorableHits > 0 && !sessionStartTimestamp) {
-                sessionStartTimestamp = Date.now();
-            }
+  function finishTimer() {
+    if (timerInterval) {
+      cancelAnimationFrame(timerInterval);
+      timerInterval = null;
+    }
+    timerTargetEndTs = null;
+    timerRemainingMs = 0;
+    pauseSessionClock();
+    updateTimerDisplay();
+    setTimerState('setup');
+    if (timerHint) timerHint.innerText = "Time's up";
+    setScoringLocked(true);
 
-            if (scorableHits === 0) {
-                statsTotal.innerText = '0';
-                statsDucksPerMinute.innerText = '0';
-                statsSecondsPerDuck.innerText = '—';
-                sessionStartTimestamp = null;
-            } else {
-                const now = Date.now();
-                const elapsedMs = Math.max(0, sessionStartTimestamp ? now - sessionStartTimestamp : 0);
-                const enoughHits = scorableHits >= MIN_RATE_SAMPLE_HITS;
-                const enoughTime = elapsedMs >= MIN_RATE_SAMPLE_MS;
-                const canShowRates = enoughHits || enoughTime;
+    let blinkCount = 0;
+    if (!prefersReducedMotion) {
+      blinkInterval = setInterval(function () {
+        if (timerDisplay) timerDisplay.classList.toggle('opacity-30', blinkCount % 2 === 0);
+        blinkCount++;
+      }, 250);
+    } else if (timerDisplay) {
+      timerDisplay.classList.add('opacity-60');
+    }
 
-                statsTotal.innerText = scorableHits.toLocaleString();
+    lockoutTimeout = setTimeout(function () {
+      setScoringLocked(false);
+      if (timerHint) timerHint.innerText = 'Times up — scoring unlocked';
+      if (blinkInterval) { clearInterval(blinkInterval); blinkInterval = null; }
+      if (timerDisplay) { timerDisplay.classList.remove('opacity-30'); timerDisplay.classList.remove('opacity-60'); }
+    }, 5000);
+  }
 
-                if (canShowRates && elapsedMs > 0) {
-                    const elapsedMinutes = elapsedMs / 60000;
-                    const ducksPerMinute = scorableHits / elapsedMinutes;
-                    const elapsedSeconds = elapsedMs / 1000;
-                    const secondsPerDuck = elapsedSeconds / scorableHits;
-                    statsDucksPerMinute.innerText = ducksPerMinute.toFixed(1);
-                    statsSecondsPerDuck.innerText = secondsPerDuck.toFixed(1);
-                } else {
-                    statsDucksPerMinute.innerText = '—';
-                    statsSecondsPerDuck.innerText = '—';
-                }
-            }
+  window.stopTimer = function () {
+    if (timerInterval) {
+      cancelAnimationFrame(timerInterval);
+      timerInterval = null;
+    }
+    timerTargetEndTs = null;
+    timerRemainingMs = timerStartSeconds * 1000;
+    pauseSessionClock();
+    updateTimerDisplay();
+    setTimerState('setup');
+    setScoringLocked(false);
+    updatePlayPauseUI(false);
 
-            Object.keys(positiveCounts).forEach(zone => {
-                const count = positiveCounts[zone];
-                const percent = totalHitsForMix === 0 ? 0 : (count / totalHitsForMix) * 100;
-                if (statsPercent[zone]) {
-                    statsPercent[zone].innerText = `${percent.toFixed(0)}%`;
-                }
-                if (statsBars[zone]) {
-                    statsBars[zone].style.width = `${percent}%`;
-                }
-                const pointsPercent = totalPointsScored === 0 ? 0 : ((count * zone) / totalPointsScored) * 100;
-                if (statsPointsPercent[zone]) {
-                    statsPointsPercent[zone].innerText = `${pointsPercent.toFixed(0)}%`;
-                }
-                if (statsPointsBars[zone]) {
-                    statsPointsBars[zone].style.width = `${pointsPercent}%`;
-                }
-            });
-        }
+    if (lockoutTimeout) { clearTimeout(lockoutTimeout); lockoutTimeout = null; }
+    if (blinkInterval) { clearInterval(blinkInterval); blinkInterval = null; }
+    if (timerDisplay) { timerDisplay.classList.remove('opacity-30'); timerDisplay.classList.remove('opacity-60'); }
+  };
 
-        function normalizeTimerValue(value) {
-            if (isNaN(value)) return 120;
-            return Math.min(3600, Math.max(5, value));
-        }
+  window.adjustTimer = function (seconds) {
+    const ms = seconds * 1000;
+    if (timerInterval) {
+      timerTargetEndTs += ms;
+      const now = performance.now();
+      if (timerTargetEndTs <= now) {
+        timerRemainingMs = 0;
+        finishTimer();
+      } else {
+        timerRemainingMs = timerTargetEndTs - now;
+        updateTimerDisplay();
+      }
+    } else {
+      timerRemainingMs = Math.max(0, timerRemainingMs + ms);
+      updateTimerDisplay();
+    }
+  };
 
-        function updateTimerDisplay() {
-            if (!timerDisplay) return;
-            const totalMs = Math.max(0, timerRemainingMs);
-            const totalSeconds = totalMs / 1000;
-            const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-            const seconds = Math.floor(totalSeconds % 60).toString().padStart(2, '0');
-            const milliseconds = Math.floor(totalMs % 1000).toString().padStart(3, '0');
-            timerDisplay.innerText = `${minutes}:${seconds}.${milliseconds}`;
-        }
+  function updateTimerDisplay() {
+    if (!timerDisplay) return;
+    const totalMs = Math.max(0, timerRemainingMs);
+    const totalSeconds = totalMs / 1000;
+    const minutes = pad2(Math.floor(totalSeconds / 60));
+    const seconds = pad2(Math.floor(totalSeconds % 60));
+    const milliseconds = String(Math.floor(totalMs % 1000)).padStart(3, '0');
+    timerDisplay.innerText = minutes + ':' + seconds + '.' + milliseconds;
+  }
 
-        function setTimerState(state) {
-            if (!timerSetupScreen || !timerRunningScreen || !timerHint) return;
-            if (state === 'running') {
-                timerSetupScreen.classList.add('hidden');
-                timerRunningScreen.classList.remove('hidden');
-                timerHint.innerText = 'Timer running';
-            } else {
-                timerSetupScreen.classList.remove('hidden');
-                timerRunningScreen.classList.add('hidden');
-                timerHint.innerText = 'Ready to start';
-            }
-        }
-        setTimerState('setup');
+  function setTimerState(state) {
+    if (!timerSetupScreen || !timerRunningScreen || !timerHint) return;
+    if (state === 'running') {
+      timerSetupScreen.classList.add('hidden');
+      timerRunningScreen.classList.remove('hidden');
+      timerRunningScreen.classList.add('flex');
+    } else {
+      timerSetupScreen.classList.remove('hidden');
+      timerRunningScreen.classList.remove('flex');
+      timerRunningScreen.classList.add('hidden');
+      timerHint.innerText = '';
+    }
+  }
 
-        function adjustTimer(seconds) {
-            const ms = seconds * 1000;
-            if (timerInterval) {
-                timerTargetEndTs += ms;
-                const now = performance.now();
-                if (timerTargetEndTs <= now) {
-                    timerRemainingMs = 0;
-                    finishTimer();
-                } else {
-                    timerRemainingMs = timerTargetEndTs - now;
-                    updateTimerDisplay();
-                }
-            } else {
-                timerRemainingMs += ms;
-                if (timerRemainingMs < 0) timerRemainingMs = 0;
-                updateTimerDisplay();
-            }
-        }
-
-        function startFromSetup() {
-            const newValue = normalizeTimerValue(timerStartInput ? parseInt(timerStartInput.value, 10) : 120);
-            timerStartSeconds = newValue;
-            timerRemainingMs = newValue * 1000;
-            if (timerStartInput) {
-                timerStartInput.value = newValue;
-            }
-            updateTimerDisplay();
-            startTimer();
-        }
-
-        function startTimer() {
-            if (timerInterval || timerRemainingMs <= 0) return;
-            const now = performance.now();
-            timerTargetEndTs = now + timerRemainingMs;
-            setScoringLocked(false);
-            setTimerState('running');
-            timerHint.innerText = 'Timer running';
-            timerInterval = requestAnimationFrame(tickTimer);
-        }
-
-        function tickTimer() {
-            if (!timerTargetEndTs) return;
-            const now = performance.now();
-            timerRemainingMs = Math.max(0, timerTargetEndTs - now);
-            updateTimerDisplay();
-            updateStats(); // Update stats every frame while timer runs
-            if (timerRemainingMs <= 0) {
-                finishTimer();
-            } else if (timerInterval) {
-                timerInterval = requestAnimationFrame(tickTimer);
-            }
-        }
-
-        function pauseTimer() {
-            if (!timerInterval) return;
-            cancelAnimationFrame(timerInterval);
-            timerInterval = null;
-            timerTargetEndTs = null;
-            timerHint.innerText = 'Paused';
-        }
-
-        function finishTimer() {
-            if (timerInterval) {
-                cancelAnimationFrame(timerInterval);
-                timerInterval = null;
-            }
-            timerTargetEndTs = null;
-            timerRemainingMs = 0;
-            updateTimerDisplay();
-            setTimerState('setup');
-            
-            // Lock scoring temporarily for 5 seconds
-            if (timerHint) {
-                timerHint.innerText = 'Times up';
-            }
-            setScoringLocked(true);
-            
-            // Start blinking the timer display
-            let blinkCount = 0;
-            blinkInterval = setInterval(() => {
-                if (timerDisplay) {
-                    timerDisplay.style.opacity = blinkCount % 2 === 0 ? '0.3' : '1';
-                    blinkCount++;
-                }
-            }, 250);
-            
-            // Unlock after 5 seconds
-            lockoutTimeout = setTimeout(() => {
-                setScoringLocked(false);
-                if (timerHint) {
-                    timerHint.innerText = 'Times up — scoring unlocked';
-                }
-                // Stop blinking
-                if (blinkInterval) {
-                    clearInterval(blinkInterval);
-                    blinkInterval = null;
-                }
-                if (timerDisplay) {
-                    timerDisplay.style.opacity = '1';
-                }
-            }, 5000);
-        }
-
-        function stopTimer() {
-            if (timerInterval) {
-                cancelAnimationFrame(timerInterval);
-                timerInterval = null;
-            }
-            timerTargetEndTs = null;
-            timerRemainingMs = timerStartSeconds * 1000;
-            updateTimerDisplay();
-            setTimerState('setup');
-            setScoringLocked(false);
-            
-            // Clear any pending lockout
-            if (lockoutTimeout) {
-                clearTimeout(lockoutTimeout);
-                lockoutTimeout = null;
-            }
-            if (blinkInterval) {
-                clearInterval(blinkInterval);
-                blinkInterval = null;
-            }
-            if (timerDisplay) {
-                timerDisplay.style.opacity = '1';
-            }
-        }
-    </script>
+  // ---------- init ----------
+  loadPersisted();
+  buildPresetRow();
+  writeTimerFieldsFromSeconds(timerStartSeconds);
+  syncPresetHighlight(timerStartSeconds);
+  setTimerState('setup');
+  setScoringLocked(false);
+  updatePlayPauseUI(false);
+  updateDisplay();
+  updateTimerDisplay();
+})();
+</script>
 </body>
 </html>
