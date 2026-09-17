@@ -22,6 +22,6 @@ The launcher was a made with a very cheap brushed dc motor, a relay, and a coupl
 [CAD Model - Onshape](https://cad.onshape.com/documents/fea657253e3efcf7a8011b18/w/9f6b0cfca8e076060c58e5d4/e/e4dd6842f8802302730311c8)
 
 ## Scoring Website
-There is also a very basic score keeping html file included and hosted on my [github pages](https://purerandomgit.github.io/DuckLaucher/). It is very basic and made last minute but the core functionality of the timer and score keeping aspects work correctly. The extra bits like the score breakdown and charts do not work fully and will normally break if the timer is paused.
+There is also a very basic score keeping html file included and hosted here: [github pages](https://purerandomgit.github.io/DuckLaucher/). 
 
 ![WebsiteExample](ScoringWebsite.png)
